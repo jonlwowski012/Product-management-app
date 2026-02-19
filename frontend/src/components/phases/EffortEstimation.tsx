@@ -121,7 +121,7 @@ export default function EffortEstimation({ data, onSave }: EffortEstimationProps
           className="input"
           value={estimatedDevWeeks}
           onChange={(e) => setEstimatedDevWeeks(parseInt(e.target.value) || 0)}
-          placeholder="e.g., 12"
+          placeholder="e.g., 2-4 (quick POC), 8-12 (standard model), 16-24 (complex system with pipeline)"
           min={0}
         />
       </div>
@@ -133,7 +133,7 @@ export default function EffortEstimation({ data, onSave }: EffortEstimationProps
           className="input"
           value={teamSizeNeeded}
           onChange={(e) => setTeamSizeNeeded(parseInt(e.target.value) || 1)}
-          placeholder="e.g., 3"
+          placeholder="e.g., 1 (solo POC), 2-3 (model + engineer), 5+ (full ML team with MLOps)"
           min={1}
         />
       </div>
@@ -144,7 +144,7 @@ export default function EffortEstimation({ data, onSave }: EffortEstimationProps
         setRequiredSkills,
         skillsInput,
         setSkillsInput,
-        'Type a skill and press Enter to add...',
+        'e.g., PyTorch, Computer Vision, MLOps, Data Engineering, NLP (press Enter to add)',
         'bg-blue-100 text-blue-800'
       )}
 
@@ -155,7 +155,7 @@ export default function EffortEstimation({ data, onSave }: EffortEstimationProps
           className="input"
           value={infrastructureCost}
           onChange={(e) => setInfrastructureCost(e.target.value)}
-          placeholder="e.g., $2,000/month for GPU instances"
+          placeholder="e.g., $500/mo (CPU inference), $2K-5K/mo (GPU training), $10K+/mo (multi-GPU cluster + storage)"
         />
       </div>
 
@@ -165,6 +165,11 @@ export default function EffortEstimation({ data, onSave }: EffortEstimationProps
         onChange={setLikelihoodOfSuccess}
         min={1}
         max={10}
+        levels={[
+          { range: '1-3', label: 'Low', description: 'Novel research problem; no proven approach exists; high technical uncertainty (e.g., first-of-kind model)' },
+          { range: '4-6', label: 'Medium', description: 'Proven approach on similar problems; some adaptation needed; team has partial experience (e.g., transfer learning to new domain)' },
+          { range: '7-10', label: 'High', description: 'Well-established technique; team has done this before; clear path to success (e.g., fine-tuning pretrained model on clean data)' },
+        ]}
       />
 
       <div>
@@ -178,6 +183,11 @@ export default function EffortEstimation({ data, onSave }: EffortEstimationProps
           <option value="medium">Medium</option>
           <option value="high">High</option>
         </select>
+        <div className="mt-2 space-y-1 text-xs text-gray-500">
+          <div><span className="font-medium text-gray-600">Low:</span> First attempt at this type of project; many unknowns in data, model, and infrastructure; estimates could be off by 2-3x</div>
+          <div><span className="font-medium text-gray-600">Medium:</span> Team has done similar work; reasonable estimates based on past experience; estimates could be off by 50%</div>
+          <div><span className="font-medium text-gray-600">High:</span> Very similar project completed before; well-understood scope and risks; estimates likely within 20%</div>
+        </div>
       </div>
 
       {renderTagsInput(
@@ -186,7 +196,7 @@ export default function EffortEstimation({ data, onSave }: EffortEstimationProps
         setKeyUncertainties,
         uncertaintiesInput,
         setUncertaintiesInput,
-        'Type an uncertainty and press Enter to add...',
+        'e.g., Data quality unknown, Model may not generalize, GPU availability, Regulatory approval timeline (press Enter)',
         'bg-yellow-100 text-yellow-800'
       )}
 
@@ -196,7 +206,7 @@ export default function EffortEstimation({ data, onSave }: EffortEstimationProps
         setBlockingDependencies,
         dependenciesInput,
         setDependenciesInput,
-        'Type a dependency and press Enter to add...',
+        'e.g., Data pipeline from Team X, API access approval, GPU cluster provisioning, Legal review (press Enter)',
         'bg-red-100 text-red-800'
       )}
 

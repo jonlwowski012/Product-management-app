@@ -226,6 +226,9 @@ export default function ModelSelection({ data, onSave }: ModelSelectionProps) {
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    XS: quick config change. S: tune hyperparams. M: train new model. L: new architecture + data pipeline. XL: research + custom infra.
+                  </p>
                 </div>
                 <div>
                   <label className="label">Effort (weeks)</label>
@@ -252,6 +255,11 @@ export default function ModelSelection({ data, onSave }: ModelSelectionProps) {
                     <span className={`text-sm font-semibold px-2 py-0.5 rounded ${getLikelihoodColor(exp.likelihoodOfSuccess)}`}>
                       {exp.likelihoodOfSuccess}%
                     </span>
+                  </div>
+                  <div className="mt-1 space-y-0.5 text-xs text-gray-500">
+                    <div><span className="font-medium text-gray-600">0-30%:</span> Speculative; novel approach with no prior evidence</div>
+                    <div><span className="font-medium text-gray-600">40-60%:</span> Plausible; similar approach worked on related problems</div>
+                    <div><span className="font-medium text-gray-600">70-100%:</span> High confidence; proven technique on similar data/task</div>
                   </div>
                 </div>
               </div>

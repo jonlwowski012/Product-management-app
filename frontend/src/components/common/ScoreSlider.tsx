@@ -1,12 +1,19 @@
+interface ScoreLevel {
+  range: string;
+  label: string;
+  description: string;
+}
+
 interface ScoreSliderProps {
   label: string;
   value: number;
   onChange: (value: number) => void;
   min?: number;
   max?: number;
+  levels?: ScoreLevel[];
 }
 
-export default function ScoreSlider({ label, value, onChange, min = 1, max = 10 }: ScoreSliderProps) {
+export default function ScoreSlider({ label, value, onChange, min = 1, max = 10, levels }: ScoreSliderProps) {
   const percentage = ((value - min) / (max - min)) * 100;
   const color =
     percentage > 66 ? 'text-green-600' : percentage > 33 ? 'text-yellow-600' : 'text-red-600';
@@ -29,6 +36,17 @@ export default function ScoreSlider({ label, value, onChange, min = 1, max = 10 
         <span>{min}</span>
         <span>{max}</span>
       </div>
+      {levels && (
+        <div className="mt-2 space-y-1">
+          {levels.map((level) => (
+            <div key={level.range} className="flex text-xs text-gray-500">
+              <span className="font-medium text-gray-600 w-12 shrink-0">{level.range}</span>
+              <span className="font-medium text-gray-600 w-16 shrink-0">{level.label}</span>
+              <span>{level.description}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

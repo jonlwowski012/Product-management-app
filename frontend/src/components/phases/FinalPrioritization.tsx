@@ -82,6 +82,11 @@ export default function FinalPrioritization({
             Auto-computed from previous phase data
           </p>
         )}
+        <div className="mt-2 space-y-1 text-xs text-gray-500">
+          <div><span className="font-medium text-gray-600">1-3:</span> Low priority — limited business impact, high risk, or poor data readiness; consider deferring or rejecting</div>
+          <div><span className="font-medium text-gray-600">4-6:</span> Medium priority — viable project with moderate ROI; schedule for upcoming quarter if resources allow</div>
+          <div><span className="font-medium text-gray-600">7-10:</span> High priority — strong business case, manageable risk, good data readiness; prioritize for immediate execution</div>
+        </div>
       </div>
 
       <div>
@@ -113,6 +118,12 @@ export default function FinalPrioritization({
           >
             {roadmapTier.charAt(0).toUpperCase() + roadmapTier.slice(1)}
           </span>
+        </div>
+        <div className="mt-2 space-y-1 text-xs text-gray-500">
+          <div><span className="font-medium text-gray-600">Now:</span> Active development this quarter; team assigned, resources allocated (score 7+, data ready)</div>
+          <div><span className="font-medium text-gray-600">Next:</span> Planned for next quarter; dependencies being resolved (score 5-7, needs some prep work)</div>
+          <div><span className="font-medium text-gray-600">Later:</span> On the roadmap but not yet prioritized; revisit in 2-3 quarters (score 4-6, data gaps remain)</div>
+          <div><span className="font-medium text-gray-600">Icebox:</span> Parked indefinitely; interesting idea but not viable now (score &lt;4, or blocked by major dependencies)</div>
         </div>
       </div>
 
@@ -153,6 +164,11 @@ export default function FinalPrioritization({
             <span className="text-sm text-gray-700">Rejected</span>
           </label>
         </div>
+        <div className="mt-2 space-y-1 text-xs text-gray-500">
+          <div><span className="font-medium text-gray-600">Approved:</span> All phases pass review; team is allocated; development begins (e.g., score 8, data ready, Go decision in Phase 2)</div>
+          <div><span className="font-medium text-gray-600">Deferred:</span> Promising but blocked; revisit when conditions change (e.g., waiting on data pipeline, budget cycle, or team availability)</div>
+          <div><span className="font-medium text-gray-600">Rejected:</span> Does not meet criteria; close this feature (e.g., No-Go in Phase 2, ML unnecessary in Phase 3, or score &lt;3)</div>
+        </div>
       </div>
 
       <div>
@@ -161,7 +177,7 @@ export default function FinalPrioritization({
           className="input min-h-[100px]"
           value={decisionRationale}
           onChange={(e) => setDecisionRationale(e.target.value)}
-          placeholder="Explain the reasoning behind the final decision..."
+          placeholder="e.g., Approved: Strong business case (reward 9/10), manageable risk with mitigation plan, 50K labeled images ready, team experienced with similar CV tasks. Targeting Q2 2026 launch with 3-person team."
         />
       </div>
 

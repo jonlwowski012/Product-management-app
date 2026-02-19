@@ -142,6 +142,11 @@ export default function DataAvailability({ data, onSave }: DataAvailabilityProps
               <option value="medium">Medium</option>
               <option value="high">High</option>
             </select>
+            <div className="mt-1 space-y-0.5 text-xs text-gray-500">
+              <div><span className="font-medium text-gray-600">Low:</span> Noisy labels, inconsistent formats, significant missing values (e.g., scraped web data with no QA)</div>
+              <div><span className="font-medium text-gray-600">Medium:</span> Usable but needs cleaning; some labeling inconsistencies (e.g., internal logs with partial annotations)</div>
+              <div><span className="font-medium text-gray-600">High:</span> Clean, consistent, well-documented labels with known provenance (e.g., expert-reviewed medical images)</div>
+            </div>
           </div>
         </div>
       </fieldset>
@@ -195,7 +200,7 @@ export default function DataAvailability({ data, onSave }: DataAvailabilityProps
               value={sourcesInput}
               onChange={(e) => setSourcesInput(e.target.value)}
               onKeyDown={handleAddSource}
-              placeholder="Type a source and press Enter to add..."
+              placeholder="e.g., Production database, S3 data lake, partner API, web scraping, IoT sensors (press Enter to add)"
             />
           </div>
         </div>
@@ -226,7 +231,7 @@ export default function DataAvailability({ data, onSave }: DataAvailabilityProps
           value={dataGapsInput}
           onChange={(e) => setDataGapsInput(e.target.value)}
           onKeyDown={handleAddDataGap}
-          placeholder="Type a data gap and press Enter to add..."
+          placeholder="e.g., No nighttime imagery, missing edge-case defects, no data from manufacturer X (press Enter to add)"
         />
       </div>
 
@@ -247,7 +252,7 @@ export default function DataAvailability({ data, onSave }: DataAvailabilityProps
           className="input min-h-[80px]"
           value={dataPrivacyConcerns}
           onChange={(e) => setDataPrivacyConcerns(e.target.value)}
-          placeholder="Describe any data privacy or compliance concerns..."
+          placeholder="e.g., Contains PII requiring anonymization, GDPR right-to-deletion applies, data sharing agreement needed with partner, HIPAA compliance required for health data"
         />
       </div>
 
@@ -257,6 +262,11 @@ export default function DataAvailability({ data, onSave }: DataAvailabilityProps
         onChange={setDataReadinessScore}
         min={1}
         max={10}
+        levels={[
+          { range: '1-3', label: 'Low', description: 'No labeled data; major gaps; would need months of collection before starting (e.g., new domain with no existing datasets)' },
+          { range: '4-6', label: 'Medium', description: 'Some data available but needs significant cleaning, labeling, or augmentation (e.g., 5K samples but need 50K)' },
+          { range: '7-10', label: 'High', description: 'Sufficient clean, labeled data ready to use; minor gaps easily filled (e.g., 100K labeled images with good coverage)' },
+        ]}
       />
 
       <div className="pt-4">

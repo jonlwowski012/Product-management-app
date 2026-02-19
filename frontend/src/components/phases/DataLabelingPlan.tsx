@@ -55,6 +55,13 @@ export default function DataLabelingPlan({ data, onSave }: DataLabelingPlanProps
           <option value="automated">Automated</option>
           <option value="hybrid">Hybrid</option>
         </select>
+        <div className="mt-2 space-y-1 text-xs text-gray-500">
+          <div><span className="font-medium text-gray-600">In-House:</span> Domain experts on your team label data; best for specialized tasks (e.g., radiologists labeling X-rays)</div>
+          <div><span className="font-medium text-gray-600">Outsourced:</span> Third-party annotation company; good for scale (e.g., Scale AI, Labelbox managed services)</div>
+          <div><span className="font-medium text-gray-600">Crowdsourced:</span> Platforms like MTurk; cheap and fast but lower quality (e.g., image tagging, sentiment labels)</div>
+          <div><span className="font-medium text-gray-600">Automated:</span> Programmatic labeling via heuristics, weak supervision, or LLMs (e.g., Snorkel, GPT-based auto-labeling)</div>
+          <div><span className="font-medium text-gray-600">Hybrid:</span> Combine approaches; e.g., auto-label easy cases, expert-review hard cases</div>
+        </div>
       </div>
 
       <div>
@@ -64,7 +71,7 @@ export default function DataLabelingPlan({ data, onSave }: DataLabelingPlanProps
           className="input"
           value={estimatedLabelsNeeded}
           onChange={(e) => setEstimatedLabelsNeeded(parseInt(e.target.value) || 0)}
-          placeholder="e.g., 10000"
+          placeholder="e.g., 500 (small POC), 5000 (classification), 50000 (object detection), 500000 (language model)"
           min={0}
         />
       </div>
@@ -81,6 +88,9 @@ export default function DataLabelingPlan({ data, onSave }: DataLabelingPlanProps
             Labeling guidelines are ready
           </span>
         </label>
+        <p className="mt-1 ml-8 text-xs text-gray-500">
+          Guidelines should include: label definitions with visual examples, edge case handling rules, inter-annotator agreement targets (&gt;0.8 Cohen's kappa), and escalation process for ambiguous cases.
+        </p>
       </div>
 
       <div>
@@ -90,7 +100,7 @@ export default function DataLabelingPlan({ data, onSave }: DataLabelingPlanProps
           className="input"
           value={estimatedTimeWeeks}
           onChange={(e) => setEstimatedTimeWeeks(parseInt(e.target.value) || 0)}
-          placeholder="e.g., 4"
+          placeholder="e.g., 1-2 (automated), 4-8 (outsourced 10K labels), 12+ (expert annotation of complex data)"
           min={0}
         />
       </div>
@@ -102,7 +112,7 @@ export default function DataLabelingPlan({ data, onSave }: DataLabelingPlanProps
           className="input"
           value={estimatedCost}
           onChange={(e) => setEstimatedCost(e.target.value)}
-          placeholder="e.g., $15,000"
+          placeholder="e.g., $500 (automated/LLM), $5K-$15K (outsourced 10K labels), $50K+ (expert medical annotation)"
         />
       </div>
 
@@ -112,7 +122,7 @@ export default function DataLabelingPlan({ data, onSave }: DataLabelingPlanProps
           className="input min-h-[100px]"
           value={qualityAssurancePlan}
           onChange={(e) => setQualityAssurancePlan(e.target.value)}
-          placeholder="Describe how label quality will be ensured (inter-annotator agreement, spot checks, etc.)..."
+          placeholder="e.g., Dual-annotate 20% of samples, require >0.85 Cohen's kappa; expert spot-checks on 5% random sample weekly; automated consistency checks flagging outlier annotations; monthly calibration sessions with annotator team"
         />
       </div>
 

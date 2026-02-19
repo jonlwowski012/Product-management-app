@@ -80,7 +80,7 @@ export default function BusinessRequirements({ data, onSave }: BusinessRequireme
           className="input min-h-[100px]"
           value={problemStatement}
           onChange={(e) => setProblemStatement(e.target.value)}
-          placeholder="Describe the problem this feature aims to solve..."
+          placeholder="e.g., Field technicians spend 6+ hours per site manually inspecting solar panels for defects, leading to high labor costs and missed defects in hard-to-reach areas"
         />
       </div>
 
@@ -101,7 +101,7 @@ export default function BusinessRequirements({ data, onSave }: BusinessRequireme
           className="input min-h-[80px]"
           value={successCriteria}
           onChange={(e) => setSuccessCriteria(e.target.value)}
-          placeholder="What does success look like for this feature?"
+          placeholder="e.g., Reduce manual inspection time by 50% while maintaining 95% detection accuracy, saving $200K/year in labor costs"
         />
       </div>
 
@@ -130,7 +130,7 @@ export default function BusinessRequirements({ data, onSave }: BusinessRequireme
           value={metricsInput}
           onChange={(e) => setMetricsInput(e.target.value)}
           onKeyDown={handleAddMetric}
-          placeholder="Type a metric and press Enter to add..."
+          placeholder="e.g., inspection_time, cost_per_site, defect_detection_rate, customer_NPS (press Enter to add)"
         />
       </div>
 
@@ -140,7 +140,7 @@ export default function BusinessRequirements({ data, onSave }: BusinessRequireme
           className="input min-h-[80px]"
           value={currentSolution}
           onChange={(e) => setCurrentSolution(e.target.value)}
-          placeholder="What is the current solution or workaround?"
+          placeholder="e.g., Manual visual inspection by certified technicians using handheld cameras; results logged in spreadsheets with 2-day turnaround"
         />
       </div>
 
@@ -184,6 +184,11 @@ export default function BusinessRequirements({ data, onSave }: BusinessRequireme
           <option value="medium">Medium</option>
           <option value="high">High</option>
         </select>
+        <div className="mt-2 space-y-1 text-xs text-gray-500">
+          <div><span className="font-medium text-gray-600">Low:</span> No hard deadline; exploratory or long-term initiative (e.g., "explore NLP for support tickets")</div>
+          <div><span className="font-medium text-gray-600">Medium:</span> Committed roadmap item with a target quarter (e.g., "ship defect detection by Q3")</div>
+          <div><span className="font-medium text-gray-600">High:</span> Customer commitment, regulatory requirement, or competitive threat with a firm date (e.g., "compliance deadline in 6 weeks")</div>
+        </div>
       </div>
 
       <div className="pt-4">

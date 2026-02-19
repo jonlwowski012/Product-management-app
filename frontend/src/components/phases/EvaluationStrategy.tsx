@@ -91,7 +91,10 @@ export default function EvaluationStrategy({ data, onSave }: EvaluationStrategyP
     <div className="space-y-6">
       <div>
         <div className="flex items-center justify-between mb-3">
-          <label className="label mb-0">Academic Metrics</label>
+          <div>
+            <label className="label mb-0">Academic Metrics</label>
+            <p className="text-xs text-gray-500 mt-0.5">Model performance metrics measured on held-out test data</p>
+          </div>
           <button
             type="button"
             onClick={handleAddAcademicMetric}
@@ -130,7 +133,7 @@ export default function EvaluationStrategy({ data, onSave }: EvaluationStrategyP
                     onChange={(e) =>
                       handleAcademicMetricChange(index, 'name', e.target.value)
                     }
-                    placeholder="e.g., F1 Score, AUC-ROC"
+                    placeholder="e.g., F1 Score, AUC-ROC, Precision@K, mAP, BLEU, RMSE, Latency (p99)"
                   />
                 </div>
                 <div>
@@ -142,7 +145,7 @@ export default function EvaluationStrategy({ data, onSave }: EvaluationStrategyP
                     onChange={(e) =>
                       handleAcademicMetricChange(index, 'target', e.target.value)
                     }
-                    placeholder="e.g., > 0.85"
+                    placeholder="e.g., > 0.85, < 100ms p99, > 0.90 recall for critical class"
                   />
                 </div>
               </div>
@@ -153,7 +156,10 @@ export default function EvaluationStrategy({ data, onSave }: EvaluationStrategyP
 
       <div>
         <div className="flex items-center justify-between mb-3">
-          <label className="label mb-0">Business Metrics</label>
+          <div>
+            <label className="label mb-0">Business Metrics</label>
+            <p className="text-xs text-gray-500 mt-0.5">Real-world KPIs that determine business impact of the model</p>
+          </div>
           <button
             type="button"
             onClick={handleAddBusinessMetric}
@@ -192,7 +198,7 @@ export default function EvaluationStrategy({ data, onSave }: EvaluationStrategyP
                     onChange={(e) =>
                       handleBusinessMetricChange(index, 'name', e.target.value)
                     }
-                    placeholder="e.g., Conversion rate"
+                    placeholder="e.g., Inspection time per site, Cost per defect found, Customer satisfaction (NPS)"
                   />
                 </div>
                 <div>
@@ -204,7 +210,7 @@ export default function EvaluationStrategy({ data, onSave }: EvaluationStrategyP
                     onChange={(e) =>
                       handleBusinessMetricChange(index, 'current_value', e.target.value)
                     }
-                    placeholder="e.g., 2.5%"
+                    placeholder="e.g., 6 hours/site, $850/defect, NPS 35"
                   />
                 </div>
                 <div>
@@ -216,7 +222,7 @@ export default function EvaluationStrategy({ data, onSave }: EvaluationStrategyP
                     onChange={(e) =>
                       handleBusinessMetricChange(index, 'target_value', e.target.value)
                     }
-                    placeholder="e.g., 4.0%"
+                    placeholder="e.g., 2 hours/site, $200/defect, NPS 55"
                   />
                 </div>
                 <div>
@@ -232,7 +238,7 @@ export default function EvaluationStrategy({ data, onSave }: EvaluationStrategyP
                         e.target.value
                       )
                     }
-                    placeholder="e.g., Google Analytics"
+                    placeholder="e.g., Field ops dashboard, Quarterly customer survey, Production monitoring (Datadog)"
                   />
                 </div>
               </div>
@@ -248,7 +254,7 @@ export default function EvaluationStrategy({ data, onSave }: EvaluationStrategyP
           className="input"
           value={evaluationDataset}
           onChange={(e) => setEvaluationDataset(e.target.value)}
-          placeholder="Describe or link to the evaluation dataset..."
+          placeholder="e.g., 2,000 held-out images stratified by defect type and manufacturer; stored in s3://eval-data/v2; last updated Jan 2026"
         />
       </div>
 
@@ -258,7 +264,7 @@ export default function EvaluationStrategy({ data, onSave }: EvaluationStrategyP
           className="input min-h-[100px]"
           value={abTestPlan}
           onChange={(e) => setAbTestPlan(e.target.value)}
-          placeholder="Describe the A/B testing strategy, traffic split, duration, etc."
+          placeholder="e.g., 50/50 split between ML-assisted and manual inspection for 4 weeks across 20 sites; primary metric: defects found per hour; guardrail: no missed critical defects; statistical significance: p < 0.05"
         />
       </div>
 
@@ -269,7 +275,7 @@ export default function EvaluationStrategy({ data, onSave }: EvaluationStrategyP
           className="input"
           value={minimumViablePerformance}
           onChange={(e) => setMinimumViablePerformance(e.target.value)}
-          placeholder="What is the minimum acceptable performance for launch?"
+          placeholder="e.g., F1 > 0.80, zero missed critical defects, latency < 500ms per image, must beat rule-based baseline by at least 10%"
         />
       </div>
 

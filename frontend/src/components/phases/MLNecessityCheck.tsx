@@ -102,7 +102,7 @@ export default function MLNecessityCheck({ data, onSave }: MLNecessityCheckProps
                   onChange={(e) =>
                     handleAlternativeChange(index, 'approach', e.target.value)
                   }
-                  placeholder="Describe the alternative approach..."
+                  placeholder="e.g., Rule-based thresholding, lookup table, manual review process, heuristic scoring"
                 />
               </div>
               <div>
@@ -114,7 +114,7 @@ export default function MLNecessityCheck({ data, onSave }: MLNecessityCheckProps
                   onChange={(e) =>
                     handleAlternativeChange(index, 'pros', e.target.value)
                   }
-                  placeholder="Advantages of this approach..."
+                  placeholder="e.g., Simple to implement, no training data needed, fully explainable, low maintenance"
                 />
               </div>
               <div>
@@ -126,7 +126,7 @@ export default function MLNecessityCheck({ data, onSave }: MLNecessityCheckProps
                   onChange={(e) =>
                     handleAlternativeChange(index, 'cons', e.target.value)
                   }
-                  placeholder="Disadvantages of this approach..."
+                  placeholder="e.g., Can't handle edge cases, doesn't scale to new defect types, accuracy caps at 70%"
                 />
               </div>
             </div>
@@ -140,7 +140,7 @@ export default function MLNecessityCheck({ data, onSave }: MLNecessityCheckProps
           className="input min-h-[100px]"
           value={whyMlNeeded}
           onChange={(e) => setWhyMlNeeded(e.target.value)}
-          placeholder="Explain why ML is the best approach for this problem..."
+          placeholder="e.g., The problem requires recognizing visual patterns (cracks, hotspots) across highly variable conditions. Rule-based approaches can't generalize to new panel types, lighting, or defect variants. ML enables learning from examples rather than manually coding every pattern."
         />
       </div>
 
@@ -156,6 +156,9 @@ export default function MLNecessityCheck({ data, onSave }: MLNecessityCheckProps
             ML is necessary for this feature
           </span>
         </label>
+        <p className="mt-1 ml-8 text-xs text-gray-500">
+          Check this only if alternatives above cannot achieve the success criteria. If a simpler approach gets 80% of the way there, consider starting with that as a baseline.
+        </p>
       </div>
 
       <div>
@@ -164,7 +167,7 @@ export default function MLNecessityCheck({ data, onSave }: MLNecessityCheckProps
           className="input min-h-[80px]"
           value={complexityJustification}
           onChange={(e) => setComplexityJustification(e.target.value)}
-          placeholder="Justify the added complexity of using ML..."
+          placeholder="e.g., ML adds training pipeline, monitoring, and data dependency overhead, but is justified because the pattern space is too large for manual rules (1000s of defect variants) and accuracy requirements (>95%) exceed what heuristics achieve"
         />
       </div>
 
@@ -175,7 +178,7 @@ export default function MLNecessityCheck({ data, onSave }: MLNecessityCheckProps
           className="input"
           value={simplerBaseline}
           onChange={(e) => setSimplerBaseline(e.target.value)}
-          placeholder="What simpler baseline will be compared against?"
+          placeholder="e.g., Threshold-based anomaly detection on pixel intensity; if ML doesn't beat this by 15%+ accuracy, revert to simpler approach"
         />
       </div>
 

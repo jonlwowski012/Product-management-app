@@ -62,7 +62,7 @@ export default function RiskReward({ data, onSave }: RiskRewardProps) {
           className="input min-h-[100px]"
           value={potentialReward}
           onChange={(e) => setPotentialReward(e.target.value)}
-          placeholder="Describe the potential reward or business value..."
+          placeholder="e.g., Automating defect detection could reduce inspection costs by $500K/year, improve detection accuracy from 85% to 97%, and enable same-day reporting for customers"
         />
       </div>
 
@@ -72,6 +72,11 @@ export default function RiskReward({ data, onSave }: RiskRewardProps) {
         onChange={setRewardScore}
         min={1}
         max={10}
+        levels={[
+          { range: '1-3', label: 'Low', description: 'Marginal improvement; nice-to-have with limited business impact (e.g., minor UX polish)' },
+          { range: '4-6', label: 'Medium', description: 'Meaningful efficiency gain or cost savings; measurable ROI (e.g., 20% faster processing)' },
+          { range: '7-10', label: 'High', description: 'Transformative impact; new revenue stream, major cost reduction, or competitive moat (e.g., 10x throughput)' },
+        ]}
       />
 
       <div>
@@ -112,7 +117,7 @@ export default function RiskReward({ data, onSave }: RiskRewardProps) {
                   className="input"
                   value={risk.description}
                   onChange={(e) => handleRiskChange(index, 'description', e.target.value)}
-                  placeholder="Describe the risk..."
+                  placeholder="e.g., Model may not generalize across different panel manufacturers"
                 />
               </div>
               <div>
@@ -126,6 +131,11 @@ export default function RiskReward({ data, onSave }: RiskRewardProps) {
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
                 </select>
+                <div className="mt-1 text-xs text-gray-500">
+                  <span className="font-medium text-gray-600">Low:</span> Workaround exists, minor delay.{' '}
+                  <span className="font-medium text-gray-600">Medium:</span> Significant rework or partial failure.{' '}
+                  <span className="font-medium text-gray-600">High:</span> Project failure, safety concern, or reputational damage.
+                </div>
               </div>
               <div>
                 <label className="label">Mitigation</label>
@@ -134,7 +144,7 @@ export default function RiskReward({ data, onSave }: RiskRewardProps) {
                   className="input"
                   value={risk.mitigation}
                   onChange={(e) => handleRiskChange(index, 'mitigation', e.target.value)}
-                  placeholder="How will this risk be mitigated?"
+                  placeholder="e.g., Collect training data from 5+ manufacturers; implement confidence thresholds with human review fallback"
                 />
               </div>
             </div>
@@ -148,6 +158,11 @@ export default function RiskReward({ data, onSave }: RiskRewardProps) {
         onChange={setRiskScore}
         min={1}
         max={10}
+        levels={[
+          { range: '1-3', label: 'Low', description: 'Well-understood problem; proven approach; risks are manageable with standard practices' },
+          { range: '4-6', label: 'Medium', description: 'Some unknowns; data quality or model performance may require iteration' },
+          { range: '7-10', label: 'High', description: 'Novel problem; critical safety/compliance concerns; high chance of significant rework or failure' },
+        ]}
       />
 
       <div>
@@ -186,6 +201,11 @@ export default function RiskReward({ data, onSave }: RiskRewardProps) {
             />
             <span className="text-sm text-gray-700">Needs More Info</span>
           </label>
+        </div>
+        <div className="mt-2 space-y-1 text-xs text-gray-500">
+          <div><span className="font-medium text-gray-600">Go:</span> Reward justifies risk; proceed to next phase (e.g., reward 8, risk 4 — clear ROI with manageable risk)</div>
+          <div><span className="font-medium text-gray-600">No Go:</span> Risk outweighs reward; stop here (e.g., reward 3, risk 9 — low upside with major uncertainty)</div>
+          <div><span className="font-medium text-gray-600">Needs More Info:</span> Can't decide yet; need data, POC, or stakeholder input before committing</div>
         </div>
       </div>
 
