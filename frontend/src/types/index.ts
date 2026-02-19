@@ -10,6 +10,31 @@ export interface User {
 
 export type FeatureStatus = 'draft' | 'in_progress' | 'completed' | 'archived';
 export type PhaseStatus = 'not_started' | 'in_progress' | 'completed' | 'skipped';
+export type FeatureType = 'model' | 'pipeline' | 'data' | 'infrastructure' | 'research' | 'other';
+export type Priority = 'critical' | 'high' | 'medium' | 'low';
+
+export const FEATURE_TYPES: { value: FeatureType; label: string }[] = [
+  { value: 'model', label: 'Model' },
+  { value: 'pipeline', label: 'Pipeline' },
+  { value: 'data', label: 'Data' },
+  { value: 'infrastructure', label: 'Infrastructure' },
+  { value: 'research', label: 'Research' },
+  { value: 'other', label: 'Other' },
+];
+
+export const PRIORITIES: { value: Priority; label: string; color: string }[] = [
+  { value: 'critical', label: 'Critical', color: 'text-red-700 bg-red-100' },
+  { value: 'high', label: 'High', color: 'text-orange-700 bg-orange-100' },
+  { value: 'medium', label: 'Medium', color: 'text-yellow-700 bg-yellow-100' },
+  { value: 'low', label: 'Low', color: 'text-blue-700 bg-blue-100' },
+];
+
+export const STATUSES: { value: FeatureStatus; label: string }[] = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'archived', label: 'Archived' },
+];
 
 export const PHASE_NAMES: Record<number, string> = {
   1: 'Business Requirements',
@@ -38,11 +63,18 @@ export interface Feature {
   title: string;
   description: string;
   status: FeatureStatus;
+  featureType: FeatureType;
+  priority: Priority;
   currentPhase: number;
   priorityScore: number | null;
+  storyPoints: number | null;
+  dueDate: string | null;
   assigneeId: string | null;
-  assigneeName?: string;
+  assigneeName?: string | null;
+  reporterId: string | null;
+  reporterName?: string | null;
   createdBy: string;
+  createdByName?: string | null;
   createdAt: string;
   updatedAt: string;
   tags?: Tag[];

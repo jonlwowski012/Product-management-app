@@ -4,15 +4,18 @@ import { api } from '../utils/api';
 
 interface AuthState {
   user: User | null;
+  users: User[];
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, name: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  fetchUsers: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
+  users: [],
   loading: true,
 
   login: async (email, password) => {
@@ -36,6 +39,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user, loading: false });
     } catch {
       set({ user: null, loading: false });
+    }
+  },
+
+  fetchUsers: async () => {
+    try {
+      const users = await api.get<User[]>('/auth/users');
+      set({ users });
+    } catch {
+      // ignore
     }
   },
 }));

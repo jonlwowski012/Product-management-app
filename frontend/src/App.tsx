@@ -23,7 +23,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { user, loading, checkAuth } = useAuthStore();
+  const { user, loading, checkAuth, fetchUsers } = useAuthStore();
   const { fetchProjects } = useProjectStore();
 
   useEffect(() => {
@@ -33,8 +33,9 @@ export default function App() {
   useEffect(() => {
     if (user) {
       fetchProjects();
+      fetchUsers();
     }
-  }, [user, fetchProjects]);
+  }, [user, fetchProjects, fetchUsers]);
 
   if (loading) {
     return (
@@ -56,7 +57,7 @@ export default function App() {
       >
         <Route path="/" element={<DashboardPage />} />
         <Route path="/board" element={<BoardPage />} />
-        <Route path="/feature/:id" element={<FeaturePage />} />
+        <Route path="/features/:id" element={<FeaturePage />} />
         <Route path="/roadmap" element={<RoadmapPage />} />
       </Route>
     </Routes>
