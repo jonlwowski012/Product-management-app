@@ -175,19 +175,22 @@ export interface Phase5Data {
   labeling_tool: string;
 }
 
-export interface ModelCandidate {
+export interface Experiment {
   name: string;
-  type: string;
-  rationale: string;
-  complexity: 'low' | 'medium' | 'high';
+  summary: string;
+  hypothesis: string;
+  approach: string;
+  effort: 'xs' | 'small' | 'medium' | 'large' | 'xl';
+  effortWeeks: number;
+  likelihoodOfSuccess: number;
+  status: 'proposed' | 'in_progress' | 'completed' | 'abandoned';
+  outcome: string;
 }
 
 export interface Phase6Data {
-  model_candidates: ModelCandidate[];
-  selected_model: string;
-  is_sota: boolean;
-  sota_justification: string;
-  baseline_model: string;
+  experiments: Experiment[];
+  baseline_description: string;
+  success_criteria: string;
   infrastructure_requirements: string;
 }
 
