@@ -84,3 +84,22 @@ sqlite.exec(`
     PRIMARY KEY (feature_id, tag_id)
   );
 `);
+
+// Migrate existing databases: add new columns if they don't exist
+// SQLite doesn't support IF NOT EXISTS for ALTER TABLE ADD COLUMN,
+// so we wrap each in a try/catch
+const migrations = [
+  `ALTER TABLE features ADD COLUMN feature_type TEXT NOT NULL DEFAULT 'model'`,
+  `ALTER TABLE features ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium'`,
+  `ALTER TABLE features ADD COLUMN story_points INTEGER`,
+  `ALTER TABLE features ADD COLUMN due_date TEXT`,
+  `ALTER TABLE features ADD COLUMN reporter_id TEXT REFERENCES users(id)`,
+];
+
+for (const migration of migrations) {
+  try {
+    sqlite.exec(migration);
+  } catch {
+    // Column already exists — ignore
+  }
+}
