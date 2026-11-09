@@ -1,0 +1,2 @@
+ALTER TABLE job_chunks ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE job_chunks ADD COLUMN IF NOT EXISTS warning text;

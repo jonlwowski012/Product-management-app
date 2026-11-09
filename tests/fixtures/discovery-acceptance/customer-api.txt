@@ -1,0 +1,10 @@
+Fictional interview for product acceptance testing. No real customer data.
+Company: HarborOps
+Meeting date: 2026-11-02
+
+[00:10] Interviewer: Walk me through your most recent simulation test.
+[00:18] Customer, infrastructure lead: We wait for someone to create a shared simulation environment. Last week it took two days and blocked our release test.
+[00:42] Customer, infrastructure lead: We want an API to create an isolated simulation for each CI run and delete it when the run finishes.
+[01:05] Interviewer: What could make that difficult?
+[01:12] Customer, infrastructure lead: Nodes are removed during maintenance. We need to move workloads without losing the simulation state, and snapshots are difficult today.
+[01:38] Customer, infrastructure lead: I can introduce our platform owner to explain the recovery requirements. We have not agreed to buy anything.

@@ -1,0 +1,10 @@
+Fictional interview for product acceptance testing. No real customer data.
+Company: Ridge Labs
+Meeting date: 2026-11-03
+
+[00:12] Interviewer: How do you run simulations today?
+[00:20] Customer, engineering manager: We run one simulation each week in a browser and share the environment across our three-person team.
+[00:44] Customer, engineering manager: We do not need an API to create a fresh simulation for every CI run. The manual workflow works for us.
+[01:08] Customer, engineering manager: Our biggest problem is explaining the result to the rest of the team. We copy screenshots into a document.
+[01:32] Interviewer: What have you tried?
+[01:38] Customer, engineering manager: A shared report link would save us time, but I have not evaluated a new tool or budget.

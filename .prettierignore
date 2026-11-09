@@ -1,0 +1,6 @@
+.next/
+.next-e2e/
+.local/
+.vercel/
+app/.well-known/workflow/
+package-lock.json

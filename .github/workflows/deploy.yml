@@ -1,0 +1,89 @@
+name: Deploy to Vercel
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment environment
+        required: true
+        default: preview
+        type: choice
+        options: [preview, production]
+permissions:
+  contents: read
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+jobs:
+  checks:
+    uses: ./.github/workflows/test.yml
+  deploy:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: ${{ inputs.environment }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+      APP_SECRET: ${{ secrets.APP_SECRET }}
+      APP_URL: ${{ vars.APP_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_PRICE_ID: ${{ vars.STRIPE_PRICE_ID }}
+      STRIPE_PORTAL_CONFIGURATION_ID: ${{ vars.STRIPE_PORTAL_CONFIGURATION_ID }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      SUPPORT_EMAIL: ${{ vars.SUPPORT_EMAIL }}
+      LEGAL_OPERATOR_NAME: ${{ vars.LEGAL_OPERATOR_NAME }}
+      COOKIE_SECURE: "true"
+      JOB_RUNNER: workflow
+      DEPLOY_ENV: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --global vercel@65.5.0
+      - name: Validate target before applying migrations
+        run: npm run deploy:check -- --before-migrate
+      - name: Apply locked, versioned migrations
+        run: npm run db:migrate
+      - name: Validate environment and bind database
+        run: npm run deploy:check
+      - name: Provision the versioned fictional sales demo
+        run: npm run demo:seed
+      - name: Pull Vercel project configuration
+        run: vercel pull --yes --environment="$DEPLOY_ENV" --token="$VERCEL_TOKEN"
+      - name: Check remote runtime configuration matches the validated database
+        run: node scripts/check-vercel-env.mjs
+      - name: Build and deploy
+        id: deploy
+        shell: bash
+        run: |
+          args=()
+          if [ "$DEPLOY_ENV" = production ]; then args+=(--prod); fi
+          vercel build "${args[@]}" --token="$VERCEL_TOKEN"
+          url=$(vercel deploy --prebuilt "${args[@]}" --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployment: $url" >> "$GITHUB_STEP_SUMMARY"
+      - run: npx playwright install --with-deps chromium
+      - name: Hosted browser smoke test
+        run: npm run test:hosted
+        env:
+          HOSTED_BASE_URL: ${{ steps.deploy.outputs.url }}
+          HOSTED_TEST_EMAIL: ${{ secrets.HOSTED_TEST_EMAIL }}
+          HOSTED_TEST_PASSWORD: ${{ secrets.HOSTED_TEST_PASSWORD }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          PLAYWRIGHT_CHANNEL: chromium
+          HOSTED_TEST_UPLOAD: "true"
+          HOSTED_TEST_AI: ${{ vars.HOSTED_TEST_AI }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hosted-test-results-${{ inputs.environment }}
+          path: test-results-hosted/
+          retention-days: 7

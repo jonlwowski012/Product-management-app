@@ -1,0 +1,44 @@
+name: Production operations
+on:
+  schedule:
+    - cron: "30 7 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup-and-health:
+    runs-on: ubuntu-latest
+    environment: operations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Encrypted backup
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: node scripts/secure-backup.mjs backup "$RUNNER_TEMP/evidence.evb"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-production-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/evidence.evb
+          retention-days: 30
+          if-no-files-found: error
+      - name: Maintenance and health
+        if: ${{ always() && !cancelled() }}
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node scripts/health-check.mjs

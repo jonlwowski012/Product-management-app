@@ -1,0 +1,15 @@
+.git/
+.local/
+.data/
+.next/
+.next-e2e/
+node_modules/
+.env*
+playwright-report/
+test-results*/
+*.tsbuildinfo
+.swc/
+
+# Generated local documents, screenshots, and previews.
+output/
+tmp/
