@@ -1,7 +1,7 @@
 import type pg from "pg";
 import { createHmac } from "node:crypto";
 import { AppError, query, transaction } from "./db";
-import { checkPassword, hashPassword } from "./auth";
+import { checkPassword, hashPassword } from "./crypto";
 import { stripe, syncCustomer } from "./billing";
 
 const accountFingerprint = (identity: string) =>

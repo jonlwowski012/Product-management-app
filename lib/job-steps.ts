@@ -31,8 +31,8 @@ async function safe<T>(
         );
       }
       await query(
-        "UPDATE jobs SET attempts=least(3,attempts+1),error=$1 WHERE id=$2 AND dispatch_token=$3 AND state IN ('queued','processing')",
-        [error.message, jid, attempt],
+        "UPDATE jobs SET attempts=least(3,attempts+1),error=$1,available_at=now()+($4::int * interval '1 second') WHERE id=$2 AND dispatch_token=$3 AND state IN ('queued','processing')",
+        [error.message, jid, attempt, error.retryAfterSeconds ?? 2],
       );
       throw new RetryableError("AI provider temporarily unavailable", {
         retryAfter: error.retryAfterSeconds
@@ -57,9 +57,15 @@ async function rateLimited(
 ) {
   try {
     const wait = await safe(jid, attempt, fn);
-    if (wait) return wait;
+    if (wait) {
+      await query(
+        "UPDATE jobs SET locked_at=now(),available_at=now()+($3::int * interval '1 second') WHERE id=$1 AND dispatch_token=$2",
+        [jid, attempt, wait],
+      );
+      return wait;
+    }
     await query(
-      "UPDATE jobs SET error=NULL,available_at=now() WHERE id=$1 AND dispatch_token=$2",
+      "UPDATE jobs SET error=NULL,locked_at=now(),available_at=now() WHERE id=$1 AND dispatch_token=$2",
       [jid, attempt],
     );
     return 0;
@@ -84,7 +90,13 @@ export async function extract(
   return rateLimited(jid, attempt, async () => {
     for (let offset = 0; offset < count; offset++) {
       const wait = await processChunk(jid, index + offset);
-      if (wait) return wait;
+      if (wait) {
+        await query(
+          "UPDATE jobs SET locked_at=now(),available_at=now()+($3::int * interval '1 second') WHERE id=$1 AND dispatch_token=$2",
+          [jid, attempt, wait],
+        );
+        return wait;
+      }
     }
   });
 }

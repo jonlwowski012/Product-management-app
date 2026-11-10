@@ -74,3 +74,25 @@ test("operations file access requires the existing admin secret, including malfo
     /Unauthorized/,
   );
 });
+test("a preview database cannot open live Stripe checkout", async (t) => {
+  const previous = {
+    target: process.env.DEPLOY_ENV,
+    key: process.env.STRIPE_SECRET_KEY,
+  };
+  process.env.DEPLOY_ENV = "preview";
+  process.env.STRIPE_SECRET_KEY = "sk_live_synthetic_never_used";
+  t.after(() => {
+    for (const [name, value] of [
+      ["DEPLOY_ENV", previous.target],
+      ["STRIPE_SECRET_KEY", previous.key],
+    ]) {
+      if (value === undefined) delete process.env[name!];
+      else process.env[name!] = value;
+    }
+  });
+  const { checkout } = await import("../lib/billing");
+  await assert.rejects(
+    () => checkout("synthetic-user"),
+    /Payments are unavailable in this test workspace/,
+  );
+});

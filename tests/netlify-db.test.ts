@@ -96,6 +96,66 @@ test("recovery passes sleeping owners and preserves healthy runs and newly due q
     assert.equal(byId.get(stale).state, "failed");
     assert.equal(byId.get(waking).state, "processing");
     assert.equal(byId.get(healthy).state, "processing");
+    await db.query(
+      "CREATE TABLE job_chunks(job_id uuid,chunk_index integer,completed boolean);CREATE TABLE job_reductions(job_id uuid,level integer,batch_index integer,completed boolean)",
+    );
+    const analysis = await insert("processing", "0", "-1"),
+      token = randomUUID();
+    await db.query("UPDATE jobs SET dispatch_token=$2 WHERE id=$1", [
+      analysis,
+      token,
+    ]);
+    await db.query(
+      "INSERT INTO job_chunks SELECT $1::uuid,i,i<2 FROM generate_series(0,5) i",
+      [analysis],
+    );
+    await db.query(
+      "INSERT INTO job_reductions SELECT $1::uuid,0,i,i<3 FROM generate_series(0,3) i",
+      [analysis],
+    );
+    const extracts: number[] = [],
+      reductions: number[] = [];
+    const actions = {
+      prepare: async () => 6,
+      extract: async (_job: string, index: number, count: number) => {
+        extracts.push(index);
+        await db.query(
+          "UPDATE job_chunks SET completed=true WHERE job_id=$1 AND chunk_index>=$2 AND chunk_index<$3",
+          [analysis, index, index + count],
+        );
+        return 0;
+      },
+      planReduction: async (_job: string, level: number) =>
+        level === 0 ? 4 : 0,
+      reduce: async (_job: string, _level: number, index: number) => {
+        reductions.push(index);
+        return 0;
+      },
+      publish: async () => {
+        await db.query("UPDATE jobs SET state='succeeded' WHERE id=$1", [
+          analysis,
+        ]);
+        return 0;
+      },
+      failed: async () => {
+        throw Error("Unexpected failure");
+      },
+    };
+    const { analysisWorkload } =
+      await import("../netlify/functions/discovery-background.mjs");
+    await analysisWorkload(
+      { eventData: { jobId: analysis, attempt: token }, attempt: 0 } as any,
+      actions as any,
+      (async (sql: string, args: unknown[]) =>
+        (await db.query(sql, args)).rows) as any,
+    );
+    assert.deepEqual(extracts, [2, 4]);
+    assert.deepEqual(reductions, [3]);
+    assert.equal(
+      (await db.query("SELECT state FROM jobs WHERE id=$1", [analysis])).rows[0]
+        .state,
+      "succeeded",
+    );
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await db.end();

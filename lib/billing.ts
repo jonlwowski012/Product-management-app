@@ -59,6 +59,11 @@ export async function billingStatus(user: string) {
   };
 }
 export async function checkout(user: string) {
+  if (
+    process.env.DEPLOY_ENV === "preview" &&
+    /^(sk|rk)_live_/.test(process.env.STRIPE_SECRET_KEY || "")
+  )
+    throw new AppError("Payments are unavailable in this test workspace", 503);
   const api = stripe();
   const priceId = process.env.STRIPE_PRICE_ID;
   if (!priceId)

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type pg from "pg";
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { query, transaction, AppError, id, assertWritableUser } from "./db";
 import {
   buildResearch,

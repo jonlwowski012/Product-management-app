@@ -1,7 +1,7 @@
 import { asyncWorkloadFn } from "@netlify/async-workloads";
-import { maintainWorkspace } from "../../lib/maintenance";
 export default asyncWorkloadFn(async () => {
   try {
+    const { maintainWorkspace } = await import("../../lib/maintenance");
     await maintainWorkspace();
   } catch {
     throw new Error("Scheduled maintenance temporarily unavailable");

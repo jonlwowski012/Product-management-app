@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { reserveGroq, observeGroq, GroqRateWait } from "./groq-limits";
 import type pg from "pg";
-import { decrypt } from "./auth";
+import { decrypt } from "./crypto";
 import { AppError, query, assertWritableUser, assertPersonalUser } from "./db";
 import { providerIds, providerName, groqStructuredModels } from "./providers";
 export const candidateSchema = z.object({

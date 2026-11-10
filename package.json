@@ -26,7 +26,8 @@
     "restore:encrypted": "node scripts/secure-backup.mjs restore",
     "metrics": "tsx scripts/launch-metrics.ts",
     "health": "node scripts/health-check.mjs",
-    "test:stripe": "tsx scripts/stripe-smoke.ts"
+    "test:stripe": "tsx scripts/stripe-smoke.ts",
+    "test:netlify-package": "node scripts/netlify-package-smoke.mjs"
   },
   "dependencies": {
     "@netlify/async-workloads": "0.0.92",

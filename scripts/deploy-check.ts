@@ -18,6 +18,11 @@ for (const name of [
     throw new Error("Missing deployment variable: " + name);
 }
 if (
+  target === "preview" &&
+  /^(sk|rk)_live_/.test(process.env.STRIPE_SECRET_KEY || "")
+)
+  throw new Error("Preview requires Stripe sandbox credentials");
+if (
   target === "production" &&
   (!process.env.SUPPORT_EMAIL || !process.env.LEGAL_OPERATOR_NAME)
 )

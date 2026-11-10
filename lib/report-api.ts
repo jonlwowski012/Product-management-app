@@ -2,7 +2,7 @@ import { hostedJobs } from "./job-runner";
 import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { originalStream } from "./storage";
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { AppError, query, transaction, assertWritableUser } from "./db";
 import {
   simpleMetadata,
