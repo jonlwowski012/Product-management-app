@@ -90,13 +90,7 @@ export async function extract(
   return rateLimited(jid, attempt, async () => {
     for (let offset = 0; offset < count; offset++) {
       const wait = await processChunk(jid, index + offset);
-      if (wait) {
-        await query(
-          "UPDATE jobs SET locked_at=now(),available_at=now()+($3::int * interval '1 second') WHERE id=$1 AND dispatch_token=$2",
-          [jid, attempt, wait],
-        );
-        return wait;
-      }
+      if (wait) return wait;
     }
   });
 }
