@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import AdmZip from "adm-zip";
 import { officeFixture } from "../tests/fixtures/documents";
+import { demoData } from "../lib/demo-data";
 const baseURL = process.env.HOSTED_BASE_URL;
 if (!baseURL?.startsWith("https://"))
   throw new Error("HOSTED_BASE_URL must be a deployed HTTPS origin");
@@ -47,19 +48,17 @@ try {
     }),
   ).toBeVisible();
   await expect(page.getByLabel("Demo workspace notice")).toContainText(
-    "Fictional data",
+    "Anonymized data",
   );
   const demoResponse = await context.request.get("/api/demo/bootstrap");
   expect(demoResponse.ok()).toBeTruthy();
   const demo = await demoResponse.json();
   expect(demo.user.is_demo).toBe(true);
-  expect(demo.customers).toHaveLength(8);
-  expect(demo.signals).toHaveLength(40);
-  const audit = demo.features.find(
-    (f: any) => f.title === "Searchable audit history",
+  const companies = new Set(demoData.sources.map((source) => source.company));
+  expect(demo.customers).toHaveLength(companies.size);
+  await expect(page.getByTestId("opportunity-card")).toHaveCount(
+    demoData.result.opportunities.length,
   );
-  expect(audit.metrics.for).toBe(3);
-  expect(audit.metrics.wouldPay).toBe(2);
   expect(
     (
       await context.request.post("/api/demo/settings/models", {
@@ -68,7 +67,7 @@ try {
     ).status(),
   ).toBe(403);
   await page.goto("/demo/customers");
-  await expect(page.getByTestId("company-row")).toHaveCount(8);
+  await expect(page.getByTestId("company-row")).toHaveCount(companies.size);
   await page.getByTestId("company-row").first().click();
   await expect(
     page.getByRole("heading", { name: "Conversation history", exact: true }),
