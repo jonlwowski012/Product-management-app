@@ -57,7 +57,7 @@ jobs:
       - name: Provision the versioned fictional sales demo
         run: npm run demo:seed
       - name: Pull Vercel project configuration
-        run: vercel pull --yes --environment="$DEPLOY_ENV" --token="$VERCEL_TOKEN"
+        run: vercel pull --yes --environment="$DEPLOY_ENV"
       - name: Check remote runtime configuration matches the validated database
         run: node scripts/check-vercel-env.mjs
       - name: Build and deploy
@@ -66,8 +66,7 @@ jobs:
         run: |
           args=()
           if [ "$DEPLOY_ENV" = production ]; then args+=(--prod); fi
-          vercel build "${args[@]}" --token="$VERCEL_TOKEN"
-          url=$(vercel deploy --prebuilt "${args[@]}" --token="$VERCEL_TOKEN")
+          url=$(vercel deploy --force "${args[@]}")
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Deployment: $url" >> "$GITHUB_STEP_SUMMARY"
       - run: npx playwright install --with-deps chromium
