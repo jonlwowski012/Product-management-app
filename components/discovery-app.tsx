@@ -50,19 +50,17 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
         <section className="home-hero" aria-labelledby="home-title">
           <div className="home-intro">
             <span className="eyebrow">
-              FROM CUSTOMER FEEDBACK TO PRODUCT DIRECTION
+              MAKE SENSE OF YOUR CUSTOMER CONVERSATIONS
             </span>
             <h1 id="home-title">
-              Find your next
+              What should you
               <br />
-              <em>product opportunity.</em>
-              <br />
-              Show the evidence.
+              <em>build next?</em>
             </h1>
             <p>
-              Turn interviews, call transcripts, and notes into up to three
-              clear product opportunities—with original quotes, opposing views,
-              and a practical next step.
+              You’ve got interviews, call transcripts, and a pile of notes.
+              Evidence helps you spot the problems that keep coming up, see who
+              said what, and decide what to test next.
             </p>
             <DemoEntry />
             <a
@@ -77,7 +75,7 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
               <ArrowRight size={16} aria-hidden="true" />
             </a>
             <p className="home-price-note">
-              $10/month · All features · Your AI API key
+              $10/month · All features · Bring your own AI API key
               <br />
               AI usage billed separately by your provider.
             </p>
@@ -87,7 +85,7 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
             aria-label="Illustrative example: customer feedback becomes an opportunity with evidence and a validation step"
           >
             <figcaption>
-              <span className="home-live-dot" /> A LOOK INSIDE EVIDENCE{" "}
+              <span className="home-live-dot" /> HERE’S WHAT THAT LOOKS LIKE{" "}
               <span>Fictional example</span>
             </figcaption>
             <div className="home-source-stack">
@@ -115,16 +113,16 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
                 <span>OPPORTUNITY 01</span>
                 <span>AI draft · Review needed</span>
               </div>
-              <h2>Make weekly customer reporting less manual</h2>
+              <h2>Weekly reporting keeps eating up Fridays</h2>
               <p>
-                Explore whether repeat report preparation is a problem worth
-                solving.
+                One customer loses time to this every week. Another is happy
+                with their template. It needs a closer look.
               </p>
               <div className="home-evidence-row">
                 <Check size={16} aria-hidden="true" />
                 <div>
                   <strong>Supporting evidence</strong>
-                  <span>Time spent rebuilding the same report.</span>
+                  <span>The same reporting work comes back every Friday.</span>
                 </div>
                 <span className="home-citation">Source 01</span>
               </div>
@@ -139,7 +137,7 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
               <div className="home-next-step">
                 <ArrowRight size={17} aria-hidden="true" />
                 <div>
-                  <strong>YOUR NEXT VALIDATION STEP</strong>
+                  <strong>WHAT TO TRY NEXT</strong>
                   <p>
                     Watch a customer prepare a report. Find out what repeats and
                     what still needs their judgment.
@@ -148,8 +146,8 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
               </div>
             </div>
             <p className="home-example-note">
-              <ShieldCheck size={14} aria-hidden="true" /> In your workspace,
-              open citations to check the original passage.
+              <ShieldCheck size={14} aria-hidden="true" /> Open a quote in your
+              workspace to read it in context.
             </p>
           </figure>
         </section>
@@ -160,13 +158,11 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
           aria-labelledby="process-title"
         >
           <div className="home-section-heading">
-            <span className="eyebrow">LESS SORTING. MORE LEARNING.</span>
-            <h2 id="process-title">
-              From “we heard a lot” to “here’s what to test.”
-            </h2>
+            <span className="eyebrow">AFTER THE INTERVIEWS</span>
+            <h2 id="process-title">Make sense of what you’ve heard.</h2>
             <p>
-              For product managers, founders, and researchers making sense of
-              customer conversations.
+              For product managers, founders, and researchers deciding what to
+              explore next.
             </p>
           </div>
           <div className="home-steps">
@@ -175,10 +171,11 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
                 <FolderOpen size={25} aria-hidden="true" />
                 <span>01</span>
               </div>
-              <h3>Bring the raw material</h3>
+              <h3>Drop in your transcripts</h3>
               <p>
-                Upload interviews, documents, or a folder of transcripts. Or
-                just paste your notes.
+                Upload interview transcripts, call notes, or documents you
+                already have. A whole folder works too. Or just paste your
+                notes.
               </p>
               <span className="home-step-detail">
                 TXT · MD · VTT · SRT · PDF · DOCX · PPTX
@@ -189,11 +186,11 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
                 <Search size={25} aria-hidden="true" />
                 <span>02</span>
               </div>
-              <h3>Turn transcripts into signals</h3>
+              <h3>Pull out the useful signals</h3>
               <p>
-                Evidence extracts customer problems and opposing views as
-                signals linked to original passages, then uses those findings to
-                suggest product opportunities.
+                Evidence picks out customer problems and disagreements, with a
+                link to the original words. Those signals become the starting
+                point for up to three product opportunities.
               </p>
               <span className="home-step-detail">
                 Transcripts → Signals → Opportunities
@@ -204,10 +201,11 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
                 <ListChecks size={25} aria-hidden="true" />
                 <span>03</span>
               </div>
-              <h3>Choose a next step. Keep the learning.</h3>
+              <h3>Pick something to test</h3>
               <p>
-                Pick an opportunity, track your validation, and record what you
-                learned. Add new material as discovery continues.
+                Choose an opportunity, try the suggested next step, and write
+                down what you learn. Come back with more conversations as you
+                go.
               </p>
               <span className="home-step-detail">
                 Chosen → Testing → Reviewed
@@ -218,47 +216,49 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
 
         <section className="home-value" aria-labelledby="value-title">
           <div>
-            <span className="eyebrow">WHY A DEDICATED WORKSPACE?</span>
+            <span className="eyebrow">MORE THAN A SUMMARY</span>
             <h2 id="value-title">
-              The value is in the trail
+              Have an answer to
               <br />
-              behind the recommendation.
+              “why this idea?”
             </h2>
             <p>
-              A summary is a starting point. Evidence keeps the reasoning,
-              source material, and your follow-through together.
+              You shouldn’t have to dig through old transcripts to explain a
+              product decision. Keep the quotes, the doubts, and what you
+              learned in one place.
             </p>
           </div>
           <dl>
             <div>
               <dt>
-                <Quote size={19} aria-hidden="true" /> Make the case with source
-                quotes
+                <Quote size={19} aria-hidden="true" /> See what they actually
+                said
               </dt>
               <dd>
-                Go from an opportunity to the original passage, including
-                evidence that challenges the idea.
+                Check the original words behind an opportunity, including the
+                feedback that doesn’t fit. You decide whether the idea holds up.
               </dd>
             </div>
             <div>
               <dt>
-                <Layers3 size={19} aria-hidden="true" /> Process once. Keep the
-                signals.
+                <Layers3 size={19} aria-hidden="true" /> Find the useful bits
+                again
               </dt>
               <dd>
-                The same transcript analysis populates your searchable Signals
-                library. Explore recurring themes across companies and open the
-                original quotes without running another analysis.
+                When you analyze a transcript, its findings are saved as
+                searchable signals. Browse themes across companies and check the
+                quotes without analyzing the transcript again.
               </dd>
             </div>
             <div>
               <dt>
-                <ListChecks size={19} aria-hidden="true" /> Turn analysis into a
-                decision
+                <ListChecks size={19} aria-hidden="true" /> Remember what you
+                tried
               </dt>
               <dd>
-                Save your validation plan and learning. Export the report to
-                share the reasoning with your team.
+                Save what you plan to test and what you learn along the way.
+                Share a report so your team can see how you reached your
+                decision.
               </dd>
             </div>
           </dl>
@@ -270,11 +270,11 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
           aria-labelledby="pricing-title"
         >
           <div className="home-plan">
-            <span className="eyebrow">ONE PLAN. ALL CURRENT FEATURES.</span>
+            <span className="eyebrow">WHAT YOUR $10 GETS YOU</span>
             <h2 id="pricing-title">
-              A home for your
+              Keep your customer
               <br />
-              customer evidence.
+              research together.
             </h2>
             <p className="home-plan-price">
               $10 <span>USD / month</span>
@@ -282,16 +282,16 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
             <p>One private workspace. One owner. Cancel anytime.</p>
             <ul>
               <li>
-                <Check size={17} aria-hidden="true" /> Discovery reports with
-                source passages
+                <Check size={17} aria-hidden="true" /> Reports with quotes you
+                can check
               </li>
               <li>
                 <Check size={17} aria-hidden="true" /> Customer history and
                 searchable signals
               </li>
               <li>
-                <Check size={17} aria-hidden="true" /> Validation tracking and
-                report history
+                <Check size={17} aria-hidden="true" /> A record of your tests,
+                learning, and past reports
               </li>
               <li>
                 <Check size={17} aria-hidden="true" /> Markdown, print/PDF, and
@@ -320,12 +320,12 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
               <span className="eyebrow">YOUR DISCOVERY WORKSPACE</span>
               <h2 id="auth-title">
                 {mode === "register"
-                  ? "Make your next discovery clearer."
+                  ? "Create your workspace."
                   : "Welcome back."}
               </h2>
               <p>
                 {mode === "register"
-                  ? "Create your account, connect an AI key, then subscribe to analyze your own material."
+                  ? "Create an account, connect your AI API key, and subscribe when you’re ready to work with your own transcripts."
                   : "Sign in to your evidence workspace."}
               </p>
               <form
@@ -417,14 +417,14 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
         </section>
         <p className="home-human-note">
           <ShieldCheck size={17} aria-hidden="true" /> AI drafts the analysis.
-          You check the evidence and make the decision.
+          You read the quotes and make the call.
         </p>
       </main>
       <footer className="home-footer">
         <a className="brand" href="/">
           evidence.
         </a>
-        <span>Better product decisions start with better evidence.</span>
+        <span>For the questions that come after the customer call.</span>
         <nav aria-label="Information">
           <a href="/help">Setup guide</a>
           <a href="/privacy">Privacy</a>

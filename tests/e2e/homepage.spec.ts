@@ -7,13 +7,11 @@ for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
-      "Show the evidence.",
+      "build next?",
     );
     await expect(page.getByRole("figure")).toContainText("Fictional example");
     await expect(page.getByRole("figure")).toContainText("Direct challenge");
-    await expect(page.getByRole("figure")).toContainText(
-      "YOUR NEXT VALIDATION STEP",
-    );
+    await expect(page.getByRole("figure")).toContainText("WHAT TO TRY NEXT");
     await expect(page.locator("#pricing")).toContainText(
       "Your provider bills AI usage separately",
     );
