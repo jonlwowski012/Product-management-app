@@ -1,4 +1,3 @@
-import { head, get } from "@vercel/blob";
 import {
   query,
   transaction,
@@ -8,7 +7,8 @@ import {
   assertWritableUser,
 } from "./db";
 import { decodeFiles, ingestFiles, MAX_UPLOAD } from "./ingest";
-import { blobEnabled } from "./storage";
+import { blobEnabled, netlifyStorage, readUpload, uploadKey } from "./storage";
+import { signUploadTicket } from "./upload-ticket";
 export async function reserveUploads(
   user: string,
   customer: string | null,
@@ -35,12 +35,26 @@ export async function reserveUploads(
     const reservations = [];
     for (const file of files) {
       const uid = id(),
-        pathname = `incoming/${user}/${uid}/${file.name}`;
+        key = `incoming/${user}/${uid}/${file.name}`,
+        pathname = netlifyStorage() ? "netlify:" + key : key;
       await c.query(
         "INSERT INTO upload_reservations(id,user_id,customer_id,filename,title,pathname,expected_size,discovery) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
         [uid, user, customer, file.name, title, pathname, file.size, discovery],
       );
-      reservations.push({ id: uid, pathname });
+      reservations.push({
+        id: uid,
+        pathname,
+        ...(netlifyStorage()
+          ? {
+              uploadToken: signUploadTicket(
+                key,
+                file.size,
+                Date.now() + 10 * 60 * 1000,
+                process.env.APP_SECRET || "",
+              ),
+            }
+          : {}),
+      });
     }
     return { reservations };
   });
@@ -68,14 +82,11 @@ export async function completeUpload(uid: string, user?: string) {
     throw new AppError("Upload is being processed; retry shortly", 409);
   try {
     // Read only the server-reserved pathname. Never fetch a client-supplied URL.
-    const info = await head(r.pathname);
-    if (info.size !== r.expected_size || info.size > MAX_UPLOAD)
+    const blob = await readUpload(r.pathname);
+    if (blob.size !== r.expected_size || blob.size > MAX_UPLOAD)
       throw new AppError("Uploaded file size does not match its reservation");
-    if (info.pathname !== r.pathname)
+    if (blob.pathname !== r.pathname)
       throw new AppError("Uploaded path mismatch", 403);
-    const blob = await get(info.url, { access: "private", useCache: false });
-    if (!blob || blob.statusCode !== 200)
-      throw new AppError("Upload is not available yet", 409);
     const reader = blob.stream.getReader();
     let size = 0;
     const chunks: Uint8Array[] = [];
@@ -97,8 +108,8 @@ export async function completeUpload(uid: string, user?: string) {
         r.user_id,
         r.filename,
         Buffer.concat(chunks),
-        "blob:" + info.url,
-        "blob:" + r.pathname,
+        blob.storage,
+        uploadKey(r.pathname),
       );
     } else {
       const files = decodeFiles(r.filename, Buffer.concat(chunks));
@@ -107,7 +118,13 @@ export async function completeUpload(uid: string, user?: string) {
     await transaction(async (c) => {
       await c.query(
         "UPDATE upload_reservations SET state='completed',result=$1,blob_url=$2,error=NULL WHERE id=$3",
-        [JSON.stringify(result), info.url, uid],
+        [
+          JSON.stringify(result),
+          blob.storage.startsWith("netlify:")
+            ? blob.storage
+            : blob.storage.slice(5),
+          uid,
+        ],
       );
       if (
         !r.discovery ||
@@ -116,7 +133,7 @@ export async function completeUpload(uid: string, user?: string) {
       )
         await c.query(
           "INSERT INTO storage_deletions(pathname,not_before) VALUES($1,now()+interval '1 day') ON CONFLICT(pathname) DO UPDATE SET not_before=greatest(storage_deletions.not_before,excluded.not_before)",
-          ["blob:" + r.pathname],
+          [uploadKey(r.pathname)],
         );
     });
     return result;
@@ -141,7 +158,7 @@ export async function expireUploads() {
     for (const r of rows)
       await c.query(
         "INSERT INTO storage_deletions(pathname,not_before) VALUES($1,now()+interval '1 day') ON CONFLICT(pathname) DO UPDATE SET not_before=greatest(storage_deletions.not_before,excluded.not_before)",
-        ["blob:" + r.pathname],
+        [uploadKey(r.pathname)],
       );
   });
 }

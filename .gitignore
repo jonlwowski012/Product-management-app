@@ -22,3 +22,6 @@ test-results-hosted/
 # Generated local documents, screenshots, and previews.
 output/
 tmp/
+
+# Local Netlify folder
+.netlify

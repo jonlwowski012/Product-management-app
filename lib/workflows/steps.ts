@@ -1,80 +1,7 @@
-import { FatalError, RetryableError } from "workflow";
-import { GroqRateWait } from "../groq-limits";
-import {
-  prepareJob,
-  processChunk,
-  publishJob,
-  recordFailure,
-  prepareReductionJob,
-  reduceJob,
-} from "../job-engine";
-import { AppError, query } from "../db";
-import { ProviderError } from "../ai";
-async function safe<T>(
-  jid: string,
-  attempt: string,
-  fn: () => Promise<T>,
-): Promise<T> {
-  try {
-    return await fn();
-  } catch (error) {
-    if (error instanceof GroqRateWait) throw error;
-    if (error instanceof ProviderError && error.retryable) {
-      const [job] = await query(
-        "SELECT attempts FROM jobs WHERE id=$1 AND dispatch_token=$2",
-        [jid, attempt],
-      );
-      if (!job || job.attempts >= 3) {
-        await recordFailure(jid, error, false, attempt);
-        throw new FatalError(
-          "AI provider retries exhausted. See the job status.",
-        );
-      }
-      await query(
-        "UPDATE jobs SET attempts=least(3,attempts+1),error=$1 WHERE id=$2 AND dispatch_token=$3 AND state IN ('queued','processing')",
-        [error.message, jid, attempt],
-      );
-      throw new RetryableError("AI provider temporarily unavailable", {
-        retryAfter: error.retryAfterSeconds
-          ? `${error.retryAfterSeconds}s`
-          : "2s",
-      });
-    }
-    if (error instanceof AppError) {
-      await recordFailure(jid, error, false, attempt);
-      throw new FatalError("AI draft failed validation. See the job status.");
-    }
-    // Do not leak source data or SQL parameter values through SDK error logs.
-    throw new RetryableError("Processing service temporarily unavailable", {
-      retryAfter: "2s",
-    });
-  }
-}
-async function rateLimited(
-  jid: string,
-  attempt: string,
-  fn: () => Promise<number | void>,
-) {
-  try {
-    const wait = await safe(jid, attempt, fn);
-    if (wait) return wait;
-    await query(
-      "UPDATE jobs SET error=NULL,available_at=now() WHERE id=$1 AND dispatch_token=$2",
-      [jid, attempt],
-    );
-    return 0;
-  } catch (error) {
-    if (!(error instanceof GroqRateWait)) throw error;
-    await query(
-      "UPDATE jobs SET error=$1,locked_at=now(),available_at=now()+($4::int * interval '1 second') WHERE id=$2 AND dispatch_token=$3",
-      [error.message, jid, attempt, error.seconds],
-    );
-    return error.seconds;
-  }
-}
+import * as actions from "../job-steps";
 export async function prepare(jid: string, attempt: string) {
   "use step";
-  return safe(jid, attempt, () => prepareJob(jid));
+  return actions.prepare(jid, attempt);
 }
 export async function extract(
   jid: string,
@@ -83,32 +10,23 @@ export async function extract(
   attempt: string,
 ) {
   "use step";
-  return rateLimited(jid, attempt, async () => {
-    for (let offset = 0; offset < count; offset++) {
-      const wait = await processChunk(jid, index + offset);
-      if (wait) return wait;
-    }
-  });
+  return actions.extract(jid, index, count, attempt);
 }
 export async function publish(jid: string, attempt: string) {
   "use step";
-  return rateLimited(jid, attempt, () => publishJob(jid));
+  return actions.publish(jid, attempt);
 }
 export async function failed(jid: string, attempt: string) {
   "use step";
-  await recordFailure(jid, new Error("Workflow stopped"), false, attempt);
+  return actions.failed(jid, attempt);
 }
-prepare.maxRetries = 2;
-extract.maxRetries = 2;
-publish.maxRetries = 2;
-
 export async function planReduction(
   jid: string,
   level: number,
   attempt: string,
 ) {
   "use step";
-  return safe(jid, attempt, () => prepareReductionJob(jid, level));
+  return actions.planReduction(jid, level, attempt);
 }
 export async function reduce(
   jid: string,
@@ -118,10 +36,11 @@ export async function reduce(
   attempt: string,
 ) {
   "use step";
-  return rateLimited(jid, attempt, async () => {
-    for (let offset = 0; offset < count; offset++)
-      await reduceJob(jid, level, index + offset);
-  });
+  return actions.reduce(jid, level, index, count, attempt);
 }
-planReduction.maxRetries = 2;
-reduce.maxRetries = 2;
+prepare.maxRetries =
+  extract.maxRetries =
+  publish.maxRetries =
+  planReduction.maxRetries =
+  reduce.maxRetries =
+    2;

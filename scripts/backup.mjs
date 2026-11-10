@@ -69,7 +69,20 @@ try {
     await mkdir(path.join(dir, "sources"), { mode: 0o700 });
     for (const source of sources) {
       let bytes;
-      if (source.storage_path?.startsWith("blob:")) {
+      if (source.storage_path?.startsWith("netlify:")) {
+        if (!process.env.APP_URL || !process.env.CRON_SECRET)
+          throw new Error("Netlify backups require APP_URL and CRON_SECRET");
+        const response = await fetch(
+          new URL("/api/operations/source/" + source.id, process.env.APP_URL),
+          {
+            headers: { authorization: "Bearer " + process.env.CRON_SECRET },
+            signal: AbortSignal.timeout(60000),
+          },
+        );
+        if (!response.ok)
+          throw new Error("Source original unavailable during backup");
+        bytes = Buffer.from(await response.arrayBuffer());
+      } else if (source.storage_path?.startsWith("blob:")) {
         const blob = await get(source.storage_path.slice(5), {
           access: "private",
           useCache: false,

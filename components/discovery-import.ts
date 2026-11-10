@@ -70,22 +70,63 @@ export async function importDiscoveryFiles(
             files: [{ name: file.name, size: file.size }],
           });
           signal.throwIfAborted();
-          await upload(r.pathname, file, {
-            access: "private",
-            handleUploadUrl: "/api/uploads/token",
-            clientPayload: r.id,
-            contentType: file.type || "application/octet-stream",
-            abortSignal: signal,
-            // Streaming fetch progress requires HTTP/2; the local Blob double uses HTTP/1.
-            ...(process.env.NEXT_PUBLIC_VERCEL_BLOB_API_URL?.startsWith("http:")
-              ? {}
-              : {
-                  onUploadProgress: ({ loaded: bytes }: { loaded: number }) => {
-                    loaded[index] = Math.min(file.size, bytes);
-                    progress();
-                  },
-                }),
-          });
+          if (r.uploadToken)
+            await new Promise<void>((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              const abort = () => xhr.abort();
+              const finish = (error?: Error) => {
+                signal.removeEventListener("abort", abort);
+                error ? reject(error) : resolve();
+              };
+              xhr.open("PUT", "/api/uploads/direct");
+              xhr.timeout = 120000;
+              xhr.setRequestHeader("Authorization", "Bearer " + r.uploadToken);
+              xhr.upload.onprogress = (event) => {
+                loaded[index] = Math.min(file.size, event.loaded);
+                progress();
+              };
+              xhr.onload = () =>
+                finish(
+                  xhr.status >= 200 && xhr.status < 300
+                    ? undefined
+                    : new Error("Upload failed; select the file again"),
+                );
+              xhr.onerror = () =>
+                finish(new Error("Upload connection interrupted"));
+              xhr.ontimeout = () =>
+                finish(new Error("Upload timed out; select the file again"));
+              xhr.onabort = () =>
+                finish(new DOMException("Upload cancelled", "AbortError"));
+              signal.addEventListener("abort", abort, { once: true });
+              if (signal.aborted) {
+                finish(new DOMException("Upload cancelled", "AbortError"));
+                return;
+              }
+              xhr.send(file);
+            });
+          else
+            await upload(r.pathname, file, {
+              access: "private",
+              handleUploadUrl: "/api/uploads/token",
+              clientPayload: r.id,
+              contentType: file.type || "application/octet-stream",
+              abortSignal: signal,
+              // Streaming fetch progress requires HTTP/2; the local Blob double uses HTTP/1.
+              ...(process.env.NEXT_PUBLIC_VERCEL_BLOB_API_URL?.startsWith(
+                "http:",
+              )
+                ? {}
+                : {
+                    onUploadProgress: ({
+                      loaded: bytes,
+                    }: {
+                      loaded: number;
+                    }) => {
+                      loaded[index] = Math.min(file.size, bytes);
+                      progress();
+                    },
+                  }),
+            });
           loaded[index] = file.size;
           progress();
           for (let attempt = 0; attempt < 30; attempt++) {

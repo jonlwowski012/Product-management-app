@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 test("health monitoring authenticates and fails for missing or actionable counters", async () => {
   let health = {};
   const server = createServer((request, response) => {
+    assert.equal(request.url, "/api/maintenance?health=1");
     assert.equal(request.headers.authorization, "Bearer health-fixture-secret");
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end(JSON.stringify({ health }));

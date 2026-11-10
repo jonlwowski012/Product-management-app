@@ -9,7 +9,6 @@ for (const name of [
   "APP_SECRET",
   "APP_URL",
   "CRON_SECRET",
-  "BLOB_READ_WRITE_TOKEN",
   "STRIPE_SECRET_KEY",
   "STRIPE_PRICE_ID",
   "STRIPE_PORTAL_CONFIGURATION_ID",
@@ -42,8 +41,14 @@ for (const name of [
 ])
   if (process.env[name])
     throw new Error("Remove local/test setting before deployment: " + name);
-if (process.env.JOB_RUNNER && process.env.JOB_RUNNER !== "workflow")
-  throw new Error("Hosted jobs require Workflows");
+if (process.env.STORAGE_PROVIDER === "netlify") {
+  if (process.env.JOB_RUNNER !== "netlify" || !process.env.AWL_API_KEY)
+    throw new Error("Netlify requires its durable job runner and AWL_API_KEY");
+} else if (
+  !process.env.BLOB_READ_WRITE_TOKEN ||
+  (process.env.JOB_RUNNER && process.env.JOB_RUNNER !== "workflow")
+)
+  throw new Error("Vercel requires private Blob storage and Workflows");
 const runtime = new URL(process.env.DATABASE_URL!),
   direct = new URL(process.env.DIRECT_DATABASE_URL!);
 if (

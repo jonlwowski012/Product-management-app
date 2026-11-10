@@ -57,7 +57,10 @@ export async function enqueue(
     provider: s.provider,
     model: s.model,
   });
-  if (process.env.JOB_RUNNER === "workflow" || process.env.VERCEL) {
+  if (
+    ["workflow", "netlify"].includes(process.env.JOB_RUNNER || "") ||
+    process.env.VERCEL
+  ) {
     const { dispatchJob } = await import("./dispatch");
     await dispatchJob(jid).catch(() => {}); // Committed outbox is recovered by cron.
   }

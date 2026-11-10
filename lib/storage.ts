@@ -1,24 +1,76 @@
-import { put, get, del } from "@vercel/blob";
+import { put, get, del, head } from "@vercel/blob";
+import { getStore } from "@netlify/blobs";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { query, AppError } from "./db";
 export const blobEnabled = () =>
+  netlifyStorage() ||
   !!(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+export const netlifyStorage = () => process.env.STORAGE_PROVIDER === "netlify";
+export const privateKey = (pathname: string) =>
+  (netlifyStorage() ? "netlify:" : "blob:") + pathname;
+export const uploadKey = (pathname: string) =>
+  pathname.startsWith("netlify:") ? pathname : "blob:" + pathname;
+const netlifyStore = () =>
+  getStore({ name: "evidence-originals", consistency: "strong" });
+export async function putPrivate(
+  pathname: string,
+  data: string | Uint8Array,
+  contentType: string,
+) {
+  if (netlifyStorage()) {
+    const size =
+      typeof data === "string" ? Buffer.byteLength(data) : data.byteLength;
+    const result = await netlifyStore().set(
+      pathname,
+      typeof data === "string" ? data : Uint8Array.from(data).buffer,
+      { onlyIfNew: true, metadata: { size } },
+    );
+    if (!result.modified)
+      throw new AppError("Original source already exists", 409);
+    return "netlify:" + pathname;
+  }
+  const blob = await put(pathname, data, {
+    access: "private",
+    addRandomSuffix: false,
+    contentType,
+  });
+  return "blob:" + blob.url;
+}
+export async function readUpload(pathname: string) {
+  if (pathname.startsWith("netlify:")) {
+    const blob = await netlifyStore().getWithMetadata(pathname.slice(8), {
+      type: "stream",
+    });
+    if (!blob) throw new AppError("Upload is not available yet", 409);
+    return {
+      pathname,
+      size: Number(blob.metadata.size),
+      stream: blob.data,
+      storage: pathname,
+    };
+  }
+  const info = await head(pathname),
+    blob = await get(info.url, { access: "private", useCache: false });
+  if (!blob || blob.statusCode !== 200)
+    throw new AppError("Upload is not available yet", 409);
+  return {
+    pathname: info.pathname,
+    size: info.size,
+    stream: blob.stream,
+    storage: "blob:" + info.url,
+  };
+}
 export async function storeOriginal(user: string, tid: string, text: string) {
   if (blobEnabled()) {
     const pathname = `originals/${user}/${tid}.txt`;
     await query(
       "INSERT INTO storage_deletions(pathname,transcript_id,not_before) VALUES($1,$2,now()+interval '1 day') ON CONFLICT DO NOTHING",
-      ["blob:" + pathname, tid],
+      [privateKey(pathname), tid],
     );
-    const blob = await put(pathname, text, {
-      access: "private",
-      addRandomSuffix: false,
-      contentType: "text/plain; charset=utf-8",
-    });
-    return "blob:" + blob.url;
+    return putPrivate(pathname, text, "text/plain; charset=utf-8");
   }
-  if (process.env.VERCEL)
+  if (process.env.VERCEL || process.env.SITE_ID)
     throw new AppError("Private Blob storage is not configured", 503);
   const folder = path.resolve(process.env.DATA_DIR ?? ".data", "uploads", user);
   await mkdir(folder, { recursive: true, mode: 0o700 });
@@ -27,6 +79,11 @@ export async function storeOriginal(user: string, tid: string, text: string) {
   return file;
 }
 export async function originalStream(storage: string, raw: string) {
+  if (storage.startsWith("netlify:")) {
+    const data = await netlifyStore().get(storage.slice(8), { type: "stream" });
+    if (!data) throw new AppError("Original source unavailable", 503);
+    return data;
+  }
   if (storage.startsWith("blob:")) {
     const blob = await get(storage.slice(5), {
       access: "private",
@@ -39,7 +96,9 @@ export async function originalStream(storage: string, raw: string) {
   return new Blob([raw]).stream();
 }
 export async function deleteStored(storage: string) {
-  if (storage.startsWith("blob:")) await del(storage.slice(5));
+  if (storage.startsWith("netlify:"))
+    await netlifyStore().delete(storage.slice(8));
+  else if (storage.startsWith("blob:")) await del(storage.slice(5));
   else
     await unlink(storage).catch((error) => {
       if (error.code !== "ENOENT") throw error;

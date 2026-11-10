@@ -19,6 +19,8 @@ export async function POST(req: Request) {
         if (!payload || !/^[a-f0-9-]{36}$/.test(payload))
           throw new AppError("Upload reservation required");
         const r = await reservation(payload, user.id);
+        if (r.pathname.startsWith("netlify:"))
+          throw new AppError("Use the private upload endpoint", 400);
         if (pathname !== r.pathname || r.state !== "pending")
           throw new AppError("Upload reservation does not match", 403);
         return {

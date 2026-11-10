@@ -1,6 +1,14 @@
 import "dotenv/config";
 import pg from "pg";
 import { put } from "@vercel/blob";
+import { getStore } from "@netlify/blobs";
+const netlifyStore = () =>
+  getStore({
+    name: "evidence-originals",
+    consistency: "strong",
+    siteID: process.env.NETLIFY_BLOBS_SITE_ID,
+    token: process.env.NETLIFY_BLOBS_TOKEN,
+  });
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -44,7 +52,16 @@ try {
       if (hash !== t.sha256)
         throw new Error("Transcript integrity check failed");
       let file;
-      if (process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID) {
+      if (process.env.STORAGE_PROVIDER === "netlify") {
+        const pathname = `originals/${t.user_id}/${t.id}.txt`;
+        await netlifyStore().set(pathname, t.raw_text, {
+          metadata: { size: Buffer.byteLength(t.raw_text) },
+        });
+        file = "netlify:" + pathname;
+      } else if (
+        process.env.BLOB_READ_WRITE_TOKEN ||
+        process.env.BLOB_STORE_ID
+      ) {
         const blob = await put(
           `originals/${t.user_id}/${t.id}.txt`,
           t.raw_text,
@@ -90,7 +107,16 @@ try {
           throw new Error("Discovery source integrity check failed");
         let stored,
           key = null;
-        if (process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID) {
+        if (process.env.STORAGE_PROVIDER === "netlify") {
+          const pathname = `sources/${sourceRecord.user_id}/${sourceRecord.id}`;
+          await netlifyStore().set(pathname, Uint8Array.from(bytes).buffer, {
+            metadata: { size: bytes.length },
+          });
+          stored = key = "netlify:" + pathname;
+        } else if (
+          process.env.BLOB_READ_WRITE_TOKEN ||
+          process.env.BLOB_STORE_ID
+        ) {
           const pathname = `sources/${sourceRecord.user_id}/${sourceRecord.id}`;
           const blob = await put(pathname, bytes, {
             access: "private",

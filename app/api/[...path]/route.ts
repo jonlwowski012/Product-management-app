@@ -287,7 +287,8 @@ async function handle(req: NextRequest, parts: string[]) {
     if (
       req.method === "GET" &&
       !demo &&
-      (process.env.VERCEL || process.env.JOB_RUNNER === "workflow")
+      (process.env.VERCEL ||
+        ["workflow", "netlify"].includes(process.env.JOB_RUNNER || ""))
     )
       after(async () => {
         const { recoverJobs } = await import("@/lib/dispatch");
@@ -304,7 +305,11 @@ async function handle(req: NextRequest, parts: string[]) {
     return route === "flow" ? { ...result, user: identity } : result;
   }
   if (route === "bootstrap" && req.method === "GET") {
-    if (!demo && (process.env.VERCEL || process.env.JOB_RUNNER === "workflow"))
+    if (
+      !demo &&
+      (process.env.VERCEL ||
+        ["workflow", "netlify"].includes(process.env.JOB_RUNNER || ""))
+    )
       after(async () => {
         const { recoverJobs } = await import("@/lib/dispatch");
         await recoverJobs(user).catch(() => {});

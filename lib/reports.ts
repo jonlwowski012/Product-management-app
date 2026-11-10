@@ -6,7 +6,6 @@ import { z } from "zod";
 import { query, transaction, id, AppError, assertWritableUser } from "./db";
 import { credentials, generate, ProviderError } from "./ai";
 import { readDocument, discoveryFiles } from "./documents";
-import { put } from "@vercel/blob";
 import {
   findingsSchema,
   groundedFindingRequest,
@@ -22,7 +21,12 @@ import {
   type Finding,
 } from "./opportunities";
 import type pg from "pg";
-import { scheduleDeletion, blobEnabled } from "./storage";
+import {
+  scheduleDeletion,
+  blobEnabled,
+  privateKey,
+  putPrivate,
+} from "./storage";
 import {
   MAX_DISCOVERY_FILES,
   MAX_REPORT_CHARACTERS,
@@ -60,18 +64,13 @@ export async function discoverySource(
     sid = id();
   if (!storage && blobEnabled()) {
     const pathname = `source-originals/${user}/${sid}`;
-    storageKey = "blob:" + pathname;
+    storageKey = privateKey(pathname);
     await query(
       "INSERT INTO storage_deletions(pathname,not_before) VALUES($1,now()+interval '1 day') ON CONFLICT DO NOTHING",
       [storageKey],
     );
-    const blob = await put(pathname, buffer, {
-      access: "private",
-      addRandomSuffix: false,
-      contentType: "application/octet-stream",
-    });
-    storage = "blob:" + blob.url;
-  } else if (!storage && !process.env.VERCEL) {
+    storage = await putPrivate(pathname, buffer, "application/octet-stream");
+  } else if (!storage && !process.env.VERCEL && !process.env.SITE_ID) {
     const folder = path.resolve(
       process.env.DATA_DIR ?? ".data",
       "sources",
@@ -351,7 +350,10 @@ export async function retryOmittedMaterial(user: string, rid: string) {
     );
     return { id: newReport, job: newJob };
   });
-  if (process.env.JOB_RUNNER === "workflow" || process.env.VERCEL) {
+  if (
+    ["workflow", "netlify"].includes(process.env.JOB_RUNNER || "") ||
+    process.env.VERCEL
+  ) {
     const { dispatchJob } = await import("./dispatch");
     await dispatchJob(recovered.job).catch(() => {});
   }
@@ -518,7 +520,8 @@ export async function createReport(user: string, raw: unknown) {
   });
   if (
     result.job &&
-    (process.env.JOB_RUNNER === "workflow" || process.env.VERCEL)
+    (["workflow", "netlify"].includes(process.env.JOB_RUNNER || "") ||
+      process.env.VERCEL)
   ) {
     const { dispatchJob } = await import("./dispatch");
     await dispatchJob(result.job).catch(() => {});

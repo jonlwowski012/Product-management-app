@@ -1,3 +1,4 @@
+import { blobEnabled } from "./storage";
 import { query, AppError } from "./db";
 export const resources: Record<
   string,
@@ -102,9 +103,6 @@ export async function workspaceMetadata(user: string) {
     jobs,
     audit,
     collections: Object.keys(resources),
-    uploadMode:
-      process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID
-        ? "blob"
-        : "local",
+    uploadMode: blobEnabled() ? "blob" : "local",
   };
 }

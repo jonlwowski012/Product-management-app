@@ -86,11 +86,15 @@ export async function reportApi(
     if (!s) throw new AppError("Source not found", 404);
     if (parts[2] === "download") {
       const text = s.pages.map((p: { text: string }) => p.text).join("\n");
-      const data = s.storage_path?.startsWith("blob:")
-        ? await originalStream(s.storage_path, text)
-        : s.storage_path
-          ? new Blob([new Uint8Array(await readFile(s.storage_path))]).stream()
-          : new Blob([text]).stream();
+      const data =
+        s.storage_path?.startsWith("blob:") ||
+        s.storage_path?.startsWith("netlify:")
+          ? await originalStream(s.storage_path, text)
+          : s.storage_path
+            ? new Blob([
+                new Uint8Array(await readFile(s.storage_path)),
+              ]).stream()
+            : new Blob([text]).stream();
       return new Response(data, {
         headers: {
           "Content-Type": "application/octet-stream",
@@ -209,7 +213,10 @@ export async function reportApi(
           [report.job.id],
         );
       });
-      if (process.env.JOB_RUNNER === "workflow" || process.env.VERCEL) {
+      if (
+        ["workflow", "netlify"].includes(process.env.JOB_RUNNER || "") ||
+        process.env.VERCEL
+      ) {
         const { dispatchJob } = await import("./dispatch");
         await dispatchJob(report.job.id).catch(() => {});
       }
