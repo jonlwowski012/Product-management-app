@@ -9,7 +9,18 @@ export async function dispatchJob(jid: string) {
   );
   if (!job) return;
   try {
-    const run = await start(discoveryWorkflow, [jid, token]);
+    const run =
+      process.env.VERCEL === "1"
+        ? await start(discoveryWorkflow, [jid, token], {
+            deploymentId: "latest",
+          })
+        : await start(discoveryWorkflow, [jid, token]);
+    if (process.env.VERCEL === "1")
+      console.info("Workflow dispatched", {
+        runId: run.runId,
+        callerDeployment: process.env.VERCEL_DEPLOYMENT_ID,
+        target: "latest",
+      });
     await query(
       "UPDATE jobs SET workflow_run_id=$1 WHERE id=$2 AND dispatch_token=$3",
       [run.runId, jid, token],

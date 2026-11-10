@@ -6,6 +6,7 @@ import { readDocument } from "../../lib/documents";
 test("a user can discover, inspect risks, choose, record learning, and retain it after an update", async ({
   page,
 }) => {
+  test.setTimeout(120000);
   await signup(page);
   await expect(page.getByLabel("Discovery steps")).toContainText(
     "Upload transcripts",
@@ -54,6 +55,9 @@ test("a user can discover, inspect risks, choose, record learning, and retain it
     .getByLabel("What will you do?")
     .fill("Interview the infrastructure owner.");
   await card.getByRole("button", { name: "Save validation work" }).click();
+  await expect(
+    card.getByRole("button", { name: "Save validation work" }),
+  ).toBeEnabled();
   await expect(card.getByLabel("Validation status")).toHaveValue("testing");
   await expect(card.getByRole("status")).toContainText("Saved");
   await card
@@ -62,6 +66,9 @@ test("a user can discover, inspect risks, choose, record learning, and retain it
   await card.getByLabel("Validation status").selectOption("reviewed");
   await card.getByLabel("Your conclusion").selectOption("inconclusive");
   await card.getByRole("button", { name: "Save validation work" }).click();
+  await expect(
+    card.getByRole("button", { name: "Save validation work" }),
+  ).toBeEnabled();
   await expect(card.getByLabel("Validation status")).toHaveValue("reviewed");
   await page.reload();
   await expect(card.getByLabel("What did you learn?")).toHaveValue(

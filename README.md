@@ -44,7 +44,7 @@ Migration **011**, included in `npm run db:migrate`, adds Customers and Signals.
 
 Evidence has one plan: **$10 USD/month**, one owner and private workspace, all current features, no free trial. The public fictional demo is available before purchase. Customers connect their own OpenAI, Anthropic, Groq, or Gemini API key and pay provider charges separately. App-funded AI is disabled even if an old `INCLUDED_AI_API_KEY` remains in the environment. Saved reports remain readable; older app-funded jobs must be replaced with a new discovery using the customer's key.
 
-Production releases use a fresh Vercel build (`vercel deploy --prod --force`); restored build artifacts can retain a previous Workflow deployment binding. The deployment workflow uses this flag automatically.
+Production releases use a fresh remote Vercel build (`vercel deploy --prod --force`). New hosted analyses explicitly resolve the latest deployment for their environment; existing durable runs retain their original version and checkpoints. The deployment workflow uses the fresh-build flag automatically.
 
 Apply migrations through **016** with `npm run db:migrate` before deploying. They preserve existing data, add subscription/account records and deletion/concurrency safeguards, and enforce 1 GB of originals, 25 million extracted text characters per workspace, and one active analysis per owner. Legacy original sizes are estimated from stored pages until exact sizes are available. There are no automatic overage charges. Existing accounts are never charged automatically.
 
