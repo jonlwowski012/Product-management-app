@@ -23,7 +23,7 @@ async function enter(page: Page) {
     }),
   ).toBeVisible();
   await expect(page.getByLabel("Demo workspace notice")).toContainText(
-    "Fictional data",
+    "Anonymized data",
   );
 }
 async function snapshot(page: Page) {
@@ -57,7 +57,9 @@ test("demo reports and settings stay simple and read only", async ({
     page.getByRole("link", { name: "Export my data" }),
   ).toHaveAttribute("href", "/api/demo/export");
   const exported = await page.request.get("/api/demo/export");
-  expect((await exported.json()).transcripts).toHaveLength(12);
+  const data = await exported.json();
+  expect(data.transcripts).toHaveLength(0);
+  expect(data.sources).toHaveLength(6);
   expect(providerRequests).toEqual([]);
 });
 
@@ -241,25 +243,182 @@ test("seed is repeatable and all accepted source quotes match stored originals",
   expect(seeded.status, seeded.stderr).toBe(0);
   expect(JSON.parse(seeded.stdout).changed).toBe(false);
   expect(await snapshot(page)).toEqual(before);
-  for (const t of before.transcripts) {
-    const source = await page.request.get("/api/demo/transcripts/" + t.id);
-    const raw = (await source.json()).raw_text;
-    for (const signal of before.signals.filter(
-      (s: any) => s.transcript_id === t.id && s.verified,
-    ))
-      expect(raw.slice(signal.source_start, signal.source_end)).toBe(
-        signal.quote,
-      );
+  const report = await api(page, "demo/reports/" + demoId(1000));
+  expect(report.question).toBe(
+    "Is simulation as a service a good product idea?",
+  );
+  expect(report.result.coverage).toMatchObject({
+    sources: 6,
+    analyzed_sources: 2,
+    verified_findings: 45,
+    selected_findings: 10,
+    skipped_batches: 10,
+  });
+  expect(report.result.analysis_warnings).toHaveLength(10);
+  expect(report.result.opportunities.map((o: any) => o.title)).toEqual([
+    "API-First, Ephemeral Simulation Infrastructure",
+    "Integrated Simulation-to-Training Pipeline",
+    "Modular Entry Points to Build Trust",
+  ]);
+  for (const finding of report.result.findings) {
+    const source = await api(page, "demo/sources/" + finding.source_id);
+    expect(
+      source.page.text.slice(
+        finding.source_start,
+        finding.source_start + finding.quote.length,
+      ),
+    ).toBe(finding.quote);
+    const download = await page.request.get(
+      "/api/demo/sources/" + finding.source_id + "/download",
+    );
+    expect(download.ok()).toBe(true);
+    expect(await download.text()).toContain("Selected excerpts only");
   }
+  const first = report.result.opportunities[0];
   expect(
-    before.features.find((f: any) => f.title === "Scheduled report exports")
-      .metrics.mixed,
-  ).toBe(1);
-  expect(
-    before.features.find(
-      (f: any) => f.title === "Predictive staffing forecasts",
-    ).metrics.for,
-  ).toBe(0);
+    new Set(
+      first.supporting_ids.map(
+        (id: string) =>
+          report.result.findings.find((f: any) => f.id === id).source_id,
+      ),
+    ).size,
+  ).toBe(2);
+  expect(first.opposing_ids).toHaveLength(2);
+  await page.screenshot({
+    path: ".local/simulation-demo-desktop.png",
+    fullPage: true,
+  });
+  await page
+    .getByTestId("opportunity-card")
+    .first()
+    .locator(".flow-evidence > summary")
+    .click();
+  const quote = report.result.findings.find(
+    (f: any) => f.id === first.supporting_ids[0],
+  );
+  await page
+    .getByTestId("opportunity-card")
+    .first()
+    .locator(".flow-citation")
+    .first()
+    .getByRole("button")
+    .click();
+  await expect(page.getByRole("dialog").locator("mark")).toHaveText(
+    quote.quote,
+  );
+  await expect(page.getByRole("dialog")).toContainText(
+    "Selected excerpts only",
+  );
+  await page.screenshot({
+    path: ".local/simulation-demo-source.png",
+    fullPage: true,
+  });
+});
+
+test("upgrading the demo retires only demo files and preserves personal data and sessions", async ({
+  page,
+}) => {
+  await signup(page);
+  await seed(page);
+  const personal = await api(page, "bootstrap");
+  await enter(page);
+  const session = (await page.context().cookies()).find(
+    (c) => c.name === "evidence_demo_session",
+  )!.value;
+  const db = new pg.Client({ connectionString: connection() });
+  const retired = "/tmp/evidence-retired-demo-" + randomUUID();
+  await db.connect();
+  try {
+    await db.query(
+      "INSERT INTO transcripts(id,user_id,customer_id,title,filename,sha256,raw_text,segments,storage_path) VALUES($1,$2,$3,'Old demo interview','old-demo.txt',$4,'Old sample transcript.','[]',$5)",
+      [demoId(200), DEMO_USER_ID, demoId(100), randomUUID(), retired],
+    );
+    await db.query(
+      "INSERT INTO features(id,user_id,title) VALUES($1,$2,'Old demo feature')",
+      [demoId(400), DEMO_USER_ID],
+    );
+    await db.query(
+      "INSERT INTO briefs(id,user_id,title) VALUES($1,$2,'Old demo brief')",
+      [demoId(500), DEMO_USER_ID],
+    );
+    await db.query(
+      "INSERT INTO signals(id,user_id,customer_id,transcript_id,source_key,title,quote) VALUES($1,$2,$3,$4,'old-demo','Old sample signal','Old sample transcript.')",
+      [demoId(300), DEMO_USER_ID, demoId(100), demoId(200)],
+    );
+    await db.query(
+      "INSERT INTO feature_signals(user_id,feature_id,signal_id) VALUES($1,$2,$3)",
+      [DEMO_USER_ID, demoId(400), demoId(300)],
+    );
+    await db.query(
+      "INSERT INTO brief_features(user_id,brief_id,feature_id) VALUES($1,$2,$3)",
+      [DEMO_USER_ID, demoId(500), demoId(400)],
+    );
+    await db.query(
+      "INSERT INTO brief_signals(user_id,brief_id,signal_id) VALUES($1,$2,$3)",
+      [DEMO_USER_ID, demoId(500), demoId(300)],
+    );
+    await db.query(
+      "INSERT INTO jobs(id,user_id,transcript_id,brief_id,purpose,provider,model,state) VALUES($1,$2,$3,$4,'extract','openai','prerecorded-example','succeeded')",
+      [demoId(800), DEMO_USER_ID, demoId(200), demoId(500)],
+    );
+    await db.query(
+      "UPDATE demo_dataset SET version='previous-demo-fixture' WHERE user_id=$1",
+      [DEMO_USER_ID],
+    );
+    const upgraded = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "scripts/seed-demo.ts"],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          DATABASE_URL: connection(),
+          DIRECT_DATABASE_URL: connection(),
+        },
+      },
+    );
+    expect(upgraded.status, upgraded.stderr).toBe(0);
+    expect(JSON.parse(upgraded.stdout).changed).toBe(true);
+    for (const table of [
+      "jobs",
+      "transcripts",
+      "signals",
+      "features",
+      "briefs",
+      "feature_signals",
+      "brief_features",
+      "brief_signals",
+    ])
+      expect(
+        (
+          await db.query(`SELECT * FROM ${table} WHERE user_id=$1`, [
+            DEMO_USER_ID,
+          ])
+        ).rowCount,
+        table,
+      ).toBe(0);
+    expect(
+      (
+        await db.query(
+          "SELECT pathname FROM storage_deletions WHERE pathname=$1",
+          [retired],
+        )
+      ).rowCount,
+    ).toBe(1);
+    expect(await api(page, "bootstrap")).toEqual(personal);
+    await page.reload();
+    await expect(page.getByTestId("opportunity-card")).toHaveCount(3);
+    expect(
+      (await page.context().cookies()).find(
+        (c) => c.name === "evidence_demo_session",
+      )!.value,
+    ).toBe(session);
+  } finally {
+    await db.query("DELETE FROM storage_deletions WHERE pathname=$1", [
+      retired,
+    ]);
+    await db.end();
+  }
 });
 
 test("demo browsing and background recovery cannot dispatch AI or accept demo credentials", async ({
@@ -271,8 +430,8 @@ test("demo browsing and background recovery cannot dispatch AI or accept demo cr
   await db.connect();
   try {
     await db.query(
-      "INSERT INTO jobs(id,user_id,transcript_id,purpose,provider,model) VALUES($1,$2,$3,'extract','openai','should-never-run')",
-      [job, DEMO_USER_ID, demoId(201)],
+      "INSERT INTO jobs(id,user_id,report_id,purpose,provider,model) VALUES($1,$2,$3,'analyze','openai','should-never-run')",
+      [job, DEMO_USER_ID, demoId(1000)],
     );
     await snapshot(page);
     const code = `import assert from 'node:assert/strict'; import { dispatchJob, recoverJobs } from './lib/dispatch.ts'; import { enqueue } from './lib/jobs.ts'; import { credentials } from './lib/ai.ts'; import { prepareJob } from './lib/job-engine.ts'; import { pool } from './lib/db.ts'; await dispatchJob('${job}'); assert.equal(await recoverJobs('${DEMO_USER_ID}'),0); await assert.rejects(()=>enqueue('${DEMO_USER_ID}','extract','${demoId(201)}'),/read only/); await assert.rejects(()=>credentials('${DEMO_USER_ID}','openai'),/read only/); await assert.rejects(()=>prepareJob('${job}'),/read only/); await pool.end();`;

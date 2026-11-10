@@ -15,7 +15,7 @@ test("settings and demo fit mobile without an advanced navigation menu", async (
   await page.goto("/demo");
   await page.getByRole("button", { name: "Explore demo", exact: true }).click();
   await expect(page.getByLabel("Demo workspace notice")).toContainText(
-    "Fictional data",
+    "Anonymized data",
   );
   await expect(page.getByTestId("opportunity-card")).toHaveCount(3);
   await page.goto("/demo/settings");
@@ -110,7 +110,7 @@ test("customer and signal workflows fit mobile and keep source quotes accessible
   await page.goto("/demo");
   await page.getByRole("button", { name: "Explore demo", exact: true }).click();
   await expect(page.getByLabel("Demo workspace notice")).toContainText(
-    "Fictional data",
+    "Anonymized data",
   );
   for (const route of [
     "/demo/customers",

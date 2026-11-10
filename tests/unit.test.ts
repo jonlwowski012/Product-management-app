@@ -118,42 +118,47 @@ test("UTF-8 validation preserves original BOM and rejects malformed archive text
   );
 });
 
-test("sales demo quotes, decisions and demand metrics tell a consistent fictional story", async () => {
-  const { demoConversations, demoTranscript, demoBriefs, demoOptions } =
-    await import("../lib/demo-data");
-  const rows: (Evidence & { feature: number })[] = [];
-  let count = 0;
-  for (const [i, conversation] of demoConversations.entries()) {
-    const raw = demoTranscript(i);
-    for (const statement of conversation.statements) {
-      const proof = verifyQuote(raw, statement.quote, parseTranscript(raw));
-      assert.equal(proof.verified, !statement.unverified);
-      rows.push({
-        id: String(count++),
-        customer_id: String(conversation.customer),
-        verified: proof.verified,
-        review: statement.review ?? "approved",
-        stage: statement.review ? "guess" : "signal",
-        kind: statement.kind ?? "gap",
-        sentiment: statement.sentiment ?? "for",
-        tier: statement.tier ?? 2,
-        commitments: statement.commitments ?? [],
-        feature: statement.feature,
-      });
-    }
+test("simulation demo matches the PDF and every anonymized quote links to its excerpt", async () => {
+  const { demoData } = await import("../lib/demo-data");
+  const { validateReport, findingSchema } =
+    await import("../lib/opportunities");
+  assert.equal(
+    demoData.question,
+    "Is simulation as a service a good product idea?",
+  );
+  assert.equal(demoData.sources.length, 6);
+  assert.equal(demoData.result.findings.length, 10);
+  const findings = demoData.result.findings.map((f) => ({
+    ...findingSchema.parse(f),
+    id: f.id,
+    source_start: f.source_start,
+  }));
+  const result = validateReport(demoData.result, findings);
+  assert.deepEqual(
+    result.opportunities.map((o) => o.title),
+    [
+      "API-First, Ephemeral Simulation Infrastructure",
+      "Integrated Simulation-to-Training Pipeline",
+      "Modular Entry Points to Build Trust",
+    ],
+  );
+  for (const f of findings) {
+    const source = demoData.sources.find((s) => s.id === f.source_id)!;
+    assert.equal(
+      source.text.slice(f.source_start, f.source_start + f.quote.length),
+      f.quote,
+    );
+    assert.ok(source.text.includes("Selected excerpts only"));
   }
-  assert.equal(count, 40);
-  const audit = rollup(rows.filter((r) => r.feature === 0));
-  assert.equal(audit.for, 3);
-  assert.equal(audit.against, 1);
-  assert.equal(audit.wouldPay, 2);
-  const exports = rollup(rows.filter((r) => r.feature === 2));
-  assert.equal(exports.for, 1);
-  assert.equal(exports.against, 1);
-  assert.equal(exports.mixed, 1);
-  assert.equal(rollup(rows.filter((r) => r.feature === 7)).for, 0);
-  assert.equal(rollup(rows.filter((r) => r.feature === 4)).for, 0);
-  assert.equal(rollup(rows.filter((r) => r.feature === 1)).for, 4);
-  for (const brief of demoBriefs)
-    assert.ok(optionsValid(demoOptions(brief.feature)));
+  assert.doesNotMatch(JSON.stringify(demoData), /@|https?:\/\//i);
+  for (const finding of findings)
+    assert.ok(
+      demoData.sources.some(
+        (s) => s.id === finding.source_id && s.company === finding.customer,
+      ),
+    );
+  assert.equal(
+    demoData.result.coverage.skipped_batches,
+    demoData.result.analysis_warnings.length,
+  );
 });

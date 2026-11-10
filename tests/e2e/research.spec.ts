@@ -389,10 +389,10 @@ test("demo company and signal browsing is read only", async ({ page }) => {
   await page.goto("/demo");
   await page.getByRole("button", { name: "Explore demo", exact: true }).click();
   await expect(page.getByLabel("Demo workspace notice")).toContainText(
-    "Fictional data",
+    "Anonymized data",
   );
   await page.goto("/demo/customers");
-  await expect(page.getByTestId("company-row")).toHaveCount(8);
+  await expect(page.getByTestId("company-row")).toHaveCount(4);
   await page.getByTestId("company-row").first().click();
   await expect(
     page.getByRole("button", { name: "Edit details", exact: true }).first(),

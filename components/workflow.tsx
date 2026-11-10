@@ -516,7 +516,7 @@ export function WorkflowApp({
         {demo && (
           <div className="flow-demo" aria-label="Demo workspace notice">
             <span>
-              <strong>Sample workspace</strong> · Fictional data · Read only ·
+              <strong>Sample workspace</strong> · Anonymized data · Read only ·
               Prerecorded AI
             </span>
             <a className="text-link" href="/">
@@ -1238,8 +1238,9 @@ export function WorkflowApp({
                         </button>
                       )}
                       <small>
-                        Recovery reuses successful work and keeps this report.
-                        Your provider may charge for retried material.
+                        {demo
+                          ? "Coverage describes the original saved run. This demo includes selected anonymized excerpts; live retries are disabled."
+                          : "Recovery reuses successful work and keeps this report. Your provider may charge for retried material."}
                       </small>
                       {report!.recovery_attempts >= 3 && (
                         <p>
