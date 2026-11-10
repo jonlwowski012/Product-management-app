@@ -1,3 +1,4 @@
+import { AGREEMENT_VERSION } from "../../lib/user-agreement";
 import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { signup, api, testDatabase } from "./helpers";
@@ -77,6 +78,8 @@ test("new unpaid accounts can connect keys but cannot upload or use legacy write
     data: {
       email: randomUUID() + "@example.com",
       name: "New owner",
+      agreement_accepted: true,
+      agreement_version: AGREEMENT_VERSION,
       password: "a-secure-test-password",
     },
   });

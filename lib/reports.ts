@@ -71,7 +71,7 @@ export async function discoverySource(
       [storageKey],
     );
     storage = await putPrivate(pathname, buffer, "application/octet-stream");
-  } else if (!storage && !process.env.VERCEL && !process.env.SITE_ID) {
+  } else if (!storage && !process.env.SITE_ID) {
     const folder = path.resolve(
       process.env.DATA_DIR ?? ".data",
       "sources",

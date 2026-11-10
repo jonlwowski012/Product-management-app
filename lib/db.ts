@@ -1,5 +1,4 @@
 import pg from "pg";
-import { attachDatabasePool } from "@vercel/functions";
 import { randomUUID } from "node:crypto";
 const g = globalThis as unknown as { discoveryPool?: pg.Pool };
 export const pool =
@@ -10,7 +9,6 @@ export const pool =
     idleTimeoutMillis: 5000,
     connectionTimeoutMillis: 10000,
   });
-if (!g.discoveryPool && process.env.VERCEL) attachDatabasePool(pool);
 if (process.env.NODE_ENV !== "production") g.discoveryPool = pool;
 export async function query<
   T extends pg.QueryResultRow = pg.QueryResultRow & { id: string },

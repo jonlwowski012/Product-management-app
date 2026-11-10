@@ -6,14 +6,6 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { signup, api, seed, manual } from "../tests/e2e/helpers";
 import { pdfFixture, officeFixture } from "../tests/fixtures/documents";
-const manifest = JSON.parse(
-  await readFile(".next/diagnostics/workflows-manifest.json", "utf8"),
-);
-for (const name of ["prepare", "extract", "publish", "failed"])
-  expect(manifest.steps["lib/workflows/steps.ts"]?.[name]).toBeTruthy();
-expect(
-  manifest.workflows["lib/workflows/discovery.ts"]?.discoveryWorkflow,
-).toBeTruthy();
 const url = new URL(process.env.DATABASE_URL!);
 const adminUrl = new URL(url);
 adminUrl.pathname = "/postgres";
@@ -121,8 +113,8 @@ try {
         expect(response.headers.get("content-security-policy")).not.toContain(
           "unsafe-eval",
         );
-        expect(response.headers.get("content-security-policy")).toContain(
-          "https://vercel.com/api/blob/",
+        expect(response.headers.get("content-security-policy")).not.toContain(
+          "vercel",
         );
         break;
       }

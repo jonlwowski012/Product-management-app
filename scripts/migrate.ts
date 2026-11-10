@@ -7,7 +7,7 @@ const connectionString =
 if (!connectionString)
   throw new Error("Set DIRECT_DATABASE_URL for migrations");
 if (
-  process.env.VERCEL_ENV === "preview" &&
+  process.env.DEPLOY_ENV === "preview" &&
   connectionString === process.env.PRODUCTION_DATABASE_URL
 )
   throw new Error("Preview cannot migrate the production database");

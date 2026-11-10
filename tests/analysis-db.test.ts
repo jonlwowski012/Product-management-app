@@ -132,7 +132,7 @@ test("local worker continues after multiple Groq document failures without exhau
     const { reportDetail } = await import("../lib/reports");
     const { reportApi } = await import("../lib/report-api");
     process.env.JOB_RUNNER = "local";
-    delete process.env.VERCEL;
+    delete process.env.SITE_ID;
     await db.query(
       "UPDATE jobs SET state='failed',attempts=3,error='A new provider error' WHERE id=$1",
       [job],

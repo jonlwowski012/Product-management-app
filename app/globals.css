@@ -4071,3 +4071,29 @@ fieldset:disabled textarea {
     gap: 16px;
   }
 }
+
+.signup-agreement {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 8px;
+  margin: 18px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.signup-agreement input {
+  margin-top: 4px;
+}
+.signup-agreement a {
+  text-decoration: underline;
+  font-weight: 600;
+}
+.signup-agreement p {
+  grid-column: 2;
+  margin: 0;
+  font-size: 13px;
+}
+.launch-info section p {
+  line-height: 1.7;
+  margin-top: 16px;
+}

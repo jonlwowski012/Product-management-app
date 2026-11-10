@@ -15,6 +15,9 @@ export async function signup(page: Page) {
     .getByLabel("Password", { exact: true })
     .fill("a-secure-test-password");
   await page
+    .getByRole("checkbox", { name: /I agree to the User Agreement/ })
+    .check();
+  await page
     .getByRole("button", { name: "Create account", exact: true })
     .click();
   await expect(

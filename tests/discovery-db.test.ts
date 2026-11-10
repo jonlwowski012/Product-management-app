@@ -47,7 +47,7 @@ test("partial report recovery preserves the readable snapshot and successful che
       JOB_RUNNER: "local",
       E2E_PROVIDER_BASE_URL: `http://127.0.0.1:${address.port}`,
     });
-    delete process.env.VERCEL;
+    delete process.env.SITE_ID;
     const { discoverySource, createReport, reportDetail } =
       await import("../lib/reports");
     const { reportApi } = await import("../lib/report-api");

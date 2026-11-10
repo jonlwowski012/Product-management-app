@@ -45,6 +45,23 @@ test("backup restores a consistent database and verified original files into an 
       DATABASE_URL: sourceUrl.toString(),
       DIRECT_DATABASE_URL: sourceUrl.toString(),
     };
+    const preview = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "scripts/migrate.ts"],
+      {
+        encoding: "utf8",
+        env: {
+          ...migrationEnv,
+          DEPLOY_ENV: "preview",
+          PRODUCTION_DATABASE_URL: sourceUrl.toString(),
+        },
+      },
+    );
+    assert.notEqual(preview.status, 0);
+    assert.match(
+      preview.stderr,
+      /Preview cannot migrate the production database/,
+    );
     for (let attempt = 0; attempt < 2; attempt++) {
       const migration = spawnSync(
         process.execPath,

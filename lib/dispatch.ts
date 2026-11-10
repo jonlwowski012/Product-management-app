@@ -1,5 +1,3 @@
-import { start, getRun } from "workflow/api";
-import { discoveryWorkflow } from "./workflows/discovery";
 import { query, id } from "./db";
 export async function dispatchJob(jid: string) {
   const token = id();
@@ -18,19 +16,13 @@ export async function dispatchJob(jid: string) {
       if (sent.sendStatus !== "succeeded")
         throw new Error("Analysis dispatch unavailable");
       run = { runId: "netlify:" + sent.eventId };
-    } else
-      run =
-        process.env.VERCEL === "1"
-          ? await start(discoveryWorkflow, [jid, token], {
-              deploymentId: "latest",
-            })
-          : await start(discoveryWorkflow, [jid, token]);
-    if (process.env.VERCEL === "1")
-      console.info("Workflow dispatched", {
-        runId: run.runId,
-        callerDeployment: process.env.VERCEL_DEPLOYMENT_ID,
-        target: "latest",
-      });
+    } else {
+      const [{ start }, { discoveryWorkflow }] = await Promise.all([
+        import("workflow/api"),
+        import("./workflows/discovery"),
+      ]);
+      run = await start(discoveryWorkflow, [jid, token]);
+    }
     await query(
       "UPDATE jobs SET workflow_run_id=$1 WHERE id=$2 AND dispatch_token=$3",
       [run.runId, jid, token],
@@ -58,6 +50,7 @@ export async function recoverJobs(user?: string) {
         continue;
       }
       try {
+        const { getRun } = await import("workflow/api");
         const status = await getRun(job.workflow_run_id).status;
         if (
           status === "failed" ||

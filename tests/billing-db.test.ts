@@ -25,7 +25,7 @@ test("checkout renewal and expiry preserve sessions, payments, and owner locking
   const user = randomUUID();
   const sessions = new Map<
     string,
-    { id: string; status: string; url: string }
+    { id: string; status: string; url: string; allow_promotion_codes: boolean }
   >();
   const idempotency = new Map<string, string>();
   let subscriptions: any[] = [];
@@ -34,9 +34,9 @@ test("checkout renewal and expiry preserve sessions, payments, and owner locking
   let pause: Promise<void> | undefined;
   let reached: (() => void) | undefined;
   const server = http.createServer(async (request, response) => {
-    for await (const _ of request) {
-      /* consume Stripe's request body */
-    }
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    const params = new URLSearchParams(body);
     const route = new URL(request.url!, "http://localhost");
     if (route.searchParams.get("customer")?.startsWith("cus_fail")) {
       response.writeHead(500, { "Stripe-Should-Retry": "false" });
@@ -72,6 +72,7 @@ test("checkout renewal and expiry preserve sessions, payments, and owner locking
           id,
           status: "open",
           url: "https://checkout.stripe.com/" + id,
+          allow_promotion_codes: params.get("allow_promotion_codes") === "true",
         });
       }
       result = sessions.get(id);
@@ -169,6 +170,7 @@ test("checkout renewal and expiry preserve sessions, payments, and owner locking
       [user],
     );
     const first = await billing.checkout(user);
+    assert.equal(sessions.get("cs_1")!.allow_promotion_codes, true);
     assert.equal((await billing.checkout(user)).url, first.url);
     sessions.get("cs_1")!.status = "complete";
     const future = Math.floor(Date.now() / 1000) + 86400;
@@ -208,6 +210,16 @@ test("checkout renewal and expiry preserve sessions, payments, and owner locking
     subscriptions = [subscription("active", future)];
     invoices = [paidInvoice(future)];
     assert.equal((await billing.reconcile(user)).active, true);
+    invoices[0].lines.data[0].amount = 0;
+    await db.query(
+      "UPDATE subscriptions SET paid_until=NULL WHERE user_id=$1",
+      [user],
+    );
+    assert.equal(
+      (await billing.reconcile(user)).active,
+      true,
+      "A settled invoice with a 100% discount must grant access",
+    );
     assert.equal(
       (
         await db.query(
@@ -240,6 +252,17 @@ test("checkout renewal and expiry preserve sessions, payments, and owner locking
       second.url,
       "An expired checkout needs a fresh attempt",
     );
+    sessions.get("cs_3")!.allow_promotion_codes = false;
+    const upgraded = await billing.checkout(user);
+    assert.notEqual(
+      upgraded.url,
+      third.url,
+      "A checkout created before promotion support must be replaced",
+    );
+    assert.equal(sessions.get("cs_3")!.status, "expired");
+    assert.equal(sessions.get("cs_4")!.allow_promotion_codes, true);
+    assert.equal((await billing.checkout(user)).url, upgraded.url);
+    actions.length = 0;
     subscriptions = [subscription("active", future)];
     invoices = [paidInvoice(future)];
     assert.equal(

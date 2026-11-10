@@ -124,6 +124,8 @@ async function authRoute(req: NextRequest, route: string, demo: boolean) {
       email: z.email().max(254),
       password: z.string().min(10).max(128),
       name: text(80).optional(),
+      agreement_accepted: z.unknown().optional(),
+      agreement_version: z.unknown().optional(),
     })
     .parse(await body(req));
   const identity = input.email.toLowerCase();
@@ -134,6 +136,10 @@ async function authRoute(req: NextRequest, route: string, demo: boolean) {
         identity,
         input.name ?? "Product builder",
         input.password,
+        {
+          accepted: input.agreement_accepted,
+          version: input.agreement_version,
+        },
       );
       return { id: user };
     } catch (e) {
@@ -322,6 +328,10 @@ async function handle(req: NextRequest, parts: string[]) {
     );
   if (route === "export" && req.method === "GET") {
     const data = await bootstrap(user);
+    const agreementAcceptances = await query(
+      "SELECT created_at,detail FROM audit WHERE user_id=$1 AND action='user_agreement.accepted' ORDER BY created_at",
+      [user],
+    );
     const [
       reports,
       sources,
@@ -343,6 +353,7 @@ async function handle(req: NextRequest, parts: string[]) {
       query("SELECT * FROM discovery_validation_work WHERE user_id=$1", [user]),
     ]);
     Object.assign(data, {
+      agreementAcceptances,
       reports,
       sources,
       reportSources,

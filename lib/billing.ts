@@ -144,12 +144,16 @@ export async function checkout(user: string) {
       const existing = await api.checkout.sessions.retrieve(
         billing.checkout_id,
       );
-      if (existing.status === "open") return { url: existing.url };
+      if (existing.status === "open") {
+        if (existing.allow_promotion_codes) return { url: existing.url };
+        await api.checkout.sessions.expire(existing.id);
+      }
     }
     const session = await api.checkout.sessions.create(
       {
         customer,
         mode: "subscription",
+        allow_promotion_codes: true,
         line_items: [{ price: priceId, quantity: 1 }],
         client_reference_id: user,
         subscription_data: { metadata: { evidence_user: user } },

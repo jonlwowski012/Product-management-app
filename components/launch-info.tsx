@@ -1,13 +1,15 @@
 import Link from "next/link";
+import { userAgreement } from "@/lib/user-agreement";
 
 export function LaunchInfo({ page }: { page: string }) {
-  const support = process.env.SUPPORT_EMAIL;
-  const operator = process.env.LEGAL_OPERATOR_NAME;
+  const agreement = userAgreement();
+  const support = agreement.contact;
+  const operator = agreement.operator;
   const titles: Record<string, string> = {
     pricing: "One plan. $10/month.",
     help: "Get started with Evidence",
     privacy: "Privacy and data handling",
-    terms: "Subscription terms",
+    terms: "User Agreement",
   };
   return (
     <main className="launch-info stack">
@@ -108,9 +110,11 @@ export function LaunchInfo({ page }: { page: string }) {
       {page === "privacy" && (
         <>
           <p>
-            Evidence stores your account details, uploaded originals, extracted
-            text, analysis results, edits, and saved learning to provide your
-            workspace. Private files require account authorization.
+            Evidence stores your account details, agreement acceptance records
+            (including the version, accepted text, and timestamp), uploaded
+            originals, extracted text, analysis results, edits, and saved
+            learning to provide your workspace. Private files require account
+            authorization.
           </p>
           <p>
             Relevant source text and prompts are sent through our servers to the
@@ -152,60 +156,32 @@ export function LaunchInfo({ page }: { page: string }) {
       )}
       {page === "terms" && (
         <>
+          <p>Version {agreement.version} · Effective November 10, 2026</p>
           <p>
-            Evidence is a product-discovery workspace for one account owner. You
-            must have permission to upload and process your source material and
-            to use the provider key you connect. Do not share credentials or use
-            the service to access another person’s workspace.
+            This agreement includes warranty disclaimers, limits on liability,
+            and an indemnity for business use. Read it before creating an
+            account.
           </p>
           <p>
-            The subscription is $10 USD monthly, plus applicable taxes shown at
-            checkout. There is no free trial. Your subscription renews until
-            cancelled through Settings. Cancellation stops future renewals and
-            preserves access through the paid period. Payment failures do not
-            extend the period you have paid for.
+            Contracting operator: {operator}. Contact:{" "}
+            <a href={`mailto:${support}`}>{support}</a>.
           </p>
           <p>
-            AI provider charges are separate and remain your responsibility,
-            including requests that fail or are retried. Evidence does not
-            resell API credits. Storage and processing limits are published on
-            the pricing page; reaching a limit does not create an overage
-            charge.
+            <Link href="/privacy">Privacy and data handling notice</Link>
           </p>
-          <p>
-            After paid access ends, you have 30 days to read and export your
-            workspace before deletion. Account deletion is immediate and
-            irreversible; export first. Payment-provider financial records and
-            expiring backups are handled as described in the privacy policy.
-          </p>
-          <p>
-            Reports are draft analysis requiring human review, not a guarantee
-            of accuracy, customer demand, revenue, or business outcomes. You
-            retain ownership of your uploaded material and grant the processing
-            permissions needed to deliver the service.
-          </p>
-          <p>
-            Refund requests are reviewed individually through support; this does
-            not limit rights required by applicable law. No uptime or enterprise
-            compliance certification is promised.
-          </p>
+          {agreement.sections.map((section) => (
+            <section key={section.title}>
+              <h2>{section.title}</h2>
+              {section.paragraphs.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </section>
+          ))}
         </>
       )}
-      {(page === "privacy" || page === "terms") && (
-        <p>
-          {operator
-            ? `Service operator: ${operator}.`
-            : "Prelaunch policy draft: operator details and final terms will be published before commercial launch."}
-        </p>
-      )}
+      {page === "privacy" && <p>Service operator: {operator}.</p>}
       <footer>
-        {support ? (
-          <a href={`mailto:${support}`}>Contact support</a>
-        ) : (
-          <p>
-            Public support contact will be published before commercial launch.
-          </p>
-        )}
+        <a href={`mailto:${support}`}>Contact support</a>
         <p>
           <Link href="/">Back to Evidence</Link>
         </p>

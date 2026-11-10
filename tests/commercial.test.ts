@@ -172,7 +172,7 @@ test("commercial boundaries enforce payment, capacity, customer keys, signatures
       await rm(folder, { recursive: true, force: true });
     }
     const { discoverySource } = await import("../lib/reports");
-    process.env.VERCEL = "1";
+    process.env.SITE_ID = "synthetic-netlify-site";
     const blobToken = process.env.BLOB_READ_WRITE_TOKEN,
       storeId = process.env.BLOB_STORE_ID;
     delete process.env.BLOB_READ_WRITE_TOKEN;
@@ -190,7 +190,7 @@ test("commercial boundaries enforce payment, capacity, customer keys, signatures
     } finally {
       if (blobToken) process.env.BLOB_READ_WRITE_TOKEN = blobToken;
       if (storeId) process.env.BLOB_STORE_ID = storeId;
-      delete process.env.VERCEL;
+      delete process.env.SITE_ID;
     }
     assert.ok(
       (await credentials(user, "openai")).startsWith("test-provider-key-"),

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { AGREEMENT_VERSION } from "@/lib/user-agreement";
 import {
   Layers3,
   ArrowRight,
@@ -337,6 +338,12 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
                   try {
                     await request("auth/" + mode, {
                       ...(form.has("name") ? { name: form.get("name") } : {}),
+                      ...(mode === "register"
+                        ? {
+                            agreement_accepted: form.has("agreement"),
+                            agreement_version: AGREEMENT_VERSION,
+                          }
+                        : {}),
                       email: form.get("email"),
                       password: form.get("password"),
                     });
@@ -387,6 +394,35 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
                   />
                   <small id="password-help">At least 10 characters</small>
                 </label>
+                {mode === "register" && (
+                  <div className="signup-agreement">
+                    <input
+                      id="signup-agreement"
+                      name="agreement"
+                      type="checkbox"
+                      required
+                      aria-labelledby="signup-agreement-label"
+                    />
+                    <label
+                      id="signup-agreement-label"
+                      htmlFor="signup-agreement"
+                    >
+                      I agree to the{" "}
+                      <a href="/terms" target="_blank" rel="noopener">
+                        User Agreement
+                      </a>{" "}
+                      and acknowledge the{" "}
+                      <a href="/privacy" target="_blank" rel="noopener">
+                        Privacy and data handling notice
+                      </a>
+                      . I am at least 18 and authorized to enter this agreement.
+                    </label>
+                    <p>
+                      Includes warranty disclaimers, liability limits, and an
+                      indemnity for business use. Links open in a new tab.
+                    </p>
+                  </div>
+                )}
                 {error && (
                   <p role="alert" className="error-text">
                     {error}

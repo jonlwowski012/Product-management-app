@@ -2,6 +2,20 @@
 command = "npm run build"
 publish = ".next"
 
+[build.environment]
+NODE_VERSION = "22"
+STORAGE_PROVIDER = "netlify"
+JOB_RUNNER = "netlify"
+
+[context.production.environment]
+DEPLOY_ENV = "production"
+
+[context.deploy-preview.environment]
+DEPLOY_ENV = "preview"
+
+[context.branch-deploy.environment]
+DEPLOY_ENV = "preview"
+
 [functions]
 node_bundler = "esbuild"
 

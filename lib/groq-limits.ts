@@ -1,6 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
 import pg from "pg";
-import { attachDatabasePool } from "@vercel/functions";
 
 export class GroqRateWait extends Error {
   constructor(public seconds: number) {
@@ -51,7 +50,6 @@ if (!global.groqRatePool) {
   ratePool.on("error", () =>
     console.error("Groq rate-limit database connection interrupted"),
   );
-  if (process.env.VERCEL) attachDatabasePool(ratePool);
 }
 global.groqRatePool = ratePool;
 

@@ -4,6 +4,7 @@ import { randomBytes, createHash, createHmac } from "node:crypto";
 import { cookies } from "next/headers";
 import { query, transaction, AppError, id } from "./db";
 import { DEMO_EMAIL } from "./demo-constants";
+import { AGREEMENT_VERSION, userAgreement } from "./user-agreement";
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 const sessionCookie = (demo: boolean) =>
   demo ? "evidence_demo_session" : "evidence_session";
@@ -101,7 +102,16 @@ export async function signOut(demo = false) {
     );
   c.delete(sessionCookie(demo));
 }
-export async function register(email: string, name: string, password: string) {
+export async function register(
+  email: string,
+  name: string,
+  password: string,
+  acceptance: { accepted: unknown; version: unknown },
+) {
+  if (acceptance.accepted !== true || acceptance.version !== AGREEMENT_VERSION)
+    throw new AppError(
+      "Accept the current User Agreement before creating an account. Refresh this page if the agreement has changed.",
+    );
   if (email.toLowerCase() === DEMO_EMAIL)
     throw new AppError("This address is reserved for the public demo", 400);
   const user = id();
@@ -111,6 +121,10 @@ export async function register(email: string, name: string, password: string) {
       [user, email.toLowerCase(), name, hashPassword(password)],
     );
     await c.query("INSERT INTO settings(user_id) VALUES($1)", [user]);
+    await c.query(
+      "INSERT INTO audit(id,user_id,action,entity_type,entity_id,detail) VALUES($1,$2,'user_agreement.accepted','user',$2,$3)",
+      [id(), user, JSON.stringify(userAgreement())],
+    );
   });
   await newSession(user);
   return user;

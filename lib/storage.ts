@@ -70,7 +70,7 @@ export async function storeOriginal(user: string, tid: string, text: string) {
     );
     return putPrivate(pathname, text, "text/plain; charset=utf-8");
   }
-  if (process.env.VERCEL || process.env.SITE_ID)
+  if (process.env.SITE_ID)
     throw new AppError("Private Blob storage is not configured", 503);
   const folder = path.resolve(process.env.DATA_DIR ?? ".data", "uploads", user);
   await mkdir(folder, { recursive: true, mode: 0o700 });

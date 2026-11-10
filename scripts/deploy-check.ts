@@ -46,14 +46,14 @@ for (const name of [
 ])
   if (process.env[name])
     throw new Error("Remove local/test setting before deployment: " + name);
-if (process.env.STORAGE_PROVIDER === "netlify") {
-  if (process.env.JOB_RUNNER !== "netlify" || !process.env.AWL_API_KEY)
-    throw new Error("Netlify requires its durable job runner and AWL_API_KEY");
-} else if (
-  !process.env.BLOB_READ_WRITE_TOKEN ||
-  (process.env.JOB_RUNNER && process.env.JOB_RUNNER !== "workflow")
+if (
+  process.env.STORAGE_PROVIDER !== "netlify" ||
+  process.env.JOB_RUNNER !== "netlify" ||
+  (process.env.AWL_API_KEY?.length ?? 0) < 32
 )
-  throw new Error("Vercel requires private Blob storage and Workflows");
+  throw new Error(
+    "Netlify requires private storage, its durable job runner and a 32-character AWL_API_KEY",
+  );
 const runtime = new URL(process.env.DATABASE_URL!),
   direct = new URL(process.env.DIRECT_DATABASE_URL!);
 if (

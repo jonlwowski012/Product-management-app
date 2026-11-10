@@ -13,19 +13,8 @@ const browser = await chromium.launch({
   channel: process.env.PLAYWRIGHT_CHANNEL ?? "chrome",
 });
 const context = await browser.newContext({ baseURL });
-async function authorizeDeployment(ctx: typeof context) {
-  if (!process.env.VERCEL_AUTOMATION_BYPASS_SECRET) return;
-  const response = await ctx.request.get("/", {
-    headers: {
-      "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
-      "x-vercel-set-bypass-cookie": "true",
-    },
-  });
-  expect(response.ok()).toBeTruthy();
-}
 const page = await context.newPage();
 try {
-  await authorizeDeployment(context);
   const homepage = await context.request.get("/");
   const html = await homepage.text();
   for (const extension of ["js", "css"]) {
@@ -247,7 +236,6 @@ try {
     expect(download.ok()).toBeTruthy();
     expect(await download.body()).toEqual(originalDocument);
     const anonymous = await browser.newContext({ baseURL });
-    await authorizeDeployment(anonymous);
     expect(
       (
         await anonymous.request.get("/api/sources/" + saved.id + "/download")
