@@ -1,5 +1,5 @@
 import { getStore } from "@netlify/blobs";
-import { verifyUploadTicket } from "../../lib/upload-ticket";
+import { verifyUploadTicket } from "../../lib/upload-ticket.ts";
 declare const Netlify: { env: { get(key: string): string | undefined } };
 export default async (request: Request) => {
   if (request.method !== "PUT") return new Response(null, { status: 405 });

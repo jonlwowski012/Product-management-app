@@ -1,3 +1,4 @@
+import { hostedJobs } from "./job-runner";
 import { ensureResearchCompanies } from "./research";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -350,10 +351,7 @@ export async function retryOmittedMaterial(user: string, rid: string) {
     );
     return { id: newReport, job: newJob };
   });
-  if (
-    ["workflow", "netlify"].includes(process.env.JOB_RUNNER || "") ||
-    process.env.VERCEL
-  ) {
+  if (hostedJobs()) {
     const { dispatchJob } = await import("./dispatch");
     await dispatchJob(recovered.job).catch(() => {});
   }
@@ -518,11 +516,7 @@ export async function createReport(user: string, raw: unknown) {
     );
     return { id: rid, job: jid, cached: false };
   });
-  if (
-    result.job &&
-    (["workflow", "netlify"].includes(process.env.JOB_RUNNER || "") ||
-      process.env.VERCEL)
-  ) {
+  if (result.job && hostedJobs()) {
     const { dispatchJob } = await import("./dispatch");
     await dispatchJob(result.job).catch(() => {});
   }

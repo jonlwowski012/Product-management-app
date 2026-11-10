@@ -1,3 +1,4 @@
+import { hostedJobs } from "./job-runner";
 import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { originalStream } from "./storage";
@@ -213,10 +214,7 @@ export async function reportApi(
           [report.job.id],
         );
       });
-      if (
-        ["workflow", "netlify"].includes(process.env.JOB_RUNNER || "") ||
-        process.env.VERCEL
-      ) {
+      if (hostedJobs()) {
         const { dispatchJob } = await import("./dispatch");
         await dispatchJob(report.job.id).catch(() => {});
       }

@@ -1,3 +1,4 @@
+import { hostedJobs } from "./job-runner";
 import { query, owned, id, AppError, audit, assertWritableUser } from "./db";
 import { credentials } from "./ai";
 import {
@@ -57,10 +58,7 @@ export async function enqueue(
     provider: s.provider,
     model: s.model,
   });
-  if (
-    ["workflow", "netlify"].includes(process.env.JOB_RUNNER || "") ||
-    process.env.VERCEL
-  ) {
+  if (hostedJobs()) {
     const { dispatchJob } = await import("./dispatch");
     await dispatchJob(jid).catch(() => {}); // Committed outbox is recovered by cron.
   }

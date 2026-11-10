@@ -144,7 +144,7 @@ export async function deleteAccount(user: string, password?: string) {
     await c.query(
       `INSERT INTO storage_deletions(pathname,not_before)
       SELECT CASE WHEN pathname LIKE 'netlify:%' THEN pathname ELSE 'blob:'||pathname END,greatest(now(),expires_at)+interval '1 day' FROM upload_reservations WHERE user_id=$1
-      UNION ALL SELECT CASE WHEN blob_url LIKE 'netlify:%' THEN blob_url ELSE 'blob:'||blob_url END,greatest(now(),expires_at)+interval '1 day' FROM upload_reservations WHERE user_id=$1 AND blob_url IS NOT NULL
+      UNION SELECT CASE WHEN blob_url LIKE 'netlify:%' THEN blob_url ELSE 'blob:'||blob_url END,greatest(now(),expires_at)+interval '1 day' FROM upload_reservations WHERE user_id=$1 AND blob_url IS NOT NULL
       ON CONFLICT(pathname) DO UPDATE SET not_before=greatest(storage_deletions.not_before,excluded.not_before)`,
       [user],
     );

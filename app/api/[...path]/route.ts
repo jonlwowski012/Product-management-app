@@ -1,3 +1,4 @@
+import { hostedJobs } from "@/lib/job-runner";
 import { NextRequest, NextResponse, after } from "next/server";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
@@ -284,12 +285,7 @@ async function handle(req: NextRequest, parts: string[]) {
     return researchApi(req, parts, user, () => body(req));
   }
   if (["flow", "sources", "reports"].includes(parts[0])) {
-    if (
-      req.method === "GET" &&
-      !demo &&
-      (process.env.VERCEL ||
-        ["workflow", "netlify"].includes(process.env.JOB_RUNNER || ""))
-    )
+    if (req.method === "GET" && !demo && hostedJobs())
       after(async () => {
         const { recoverJobs } = await import("@/lib/dispatch");
         await recoverJobs(user).catch(() => {});
@@ -305,11 +301,7 @@ async function handle(req: NextRequest, parts: string[]) {
     return route === "flow" ? { ...result, user: identity } : result;
   }
   if (route === "bootstrap" && req.method === "GET") {
-    if (
-      !demo &&
-      (process.env.VERCEL ||
-        ["workflow", "netlify"].includes(process.env.JOB_RUNNER || ""))
-    )
+    if (!demo && hostedJobs())
       after(async () => {
         const { recoverJobs } = await import("@/lib/dispatch");
         await recoverJobs(user).catch(() => {});

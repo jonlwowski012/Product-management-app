@@ -396,6 +396,17 @@ test("commercial boundaries enforce payment, capacity, customer keys, signatures
       /violates foreign key/,
       "Ordinary source deletion must still protect saved reports",
     );
+    const netlifyReservation = randomUUID(),
+      netlifyPath =
+        "netlify:incoming/" +
+        user +
+        "/" +
+        netlifyReservation +
+        "/completed.txt";
+    await db.query(
+      "INSERT INTO upload_reservations(id,user_id,customer_id,filename,title,pathname,expected_size,state,blob_url,expires_at) VALUES($1,$2,$3,'completed.txt','',$4,1,'completed',$4,now()+interval '2 hours')",
+      [netlifyReservation, user, company, netlifyPath],
+    );
     await db.query("UPDATE users SET deletion_requested_at=now() WHERE id=$1", [
       user,
     ]);
@@ -419,6 +430,17 @@ test("commercial boundaries enforce payment, capacity, customer keys, signatures
       /Account deletion is in progress/,
     );
     await deleteAccount(user);
+    const {
+      rows: [netlifyCleanup],
+    } = await db.query(
+      "SELECT count(*)::int AS n,bool_and(not_before>now()+interval '1 hour') AS deferred FROM storage_deletions WHERE pathname=$1",
+      [netlifyPath],
+    );
+    assert.equal(netlifyCleanup.n, 1);
+    assert.equal(netlifyCleanup.deferred, true);
+    await db.query("DELETE FROM storage_deletions WHERE pathname=$1", [
+      netlifyPath,
+    ]);
     const {
       rows: [cleanup],
     } = await db.query(
