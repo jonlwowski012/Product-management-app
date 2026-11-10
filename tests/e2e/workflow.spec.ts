@@ -317,7 +317,7 @@ test("public demo uses the same short report and stays read only", async ({
     .filter({ hasText: "View evidence" })
     .click();
   await page
-    .getByRole("button", { name: /Original conversation/ })
+    .getByRole("button", { name: /Anonymized excerpt/ })
     .first()
     .click();
   await expect(page.getByRole("dialog").locator("mark")).toBeVisible();
