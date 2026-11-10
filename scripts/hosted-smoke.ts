@@ -22,9 +22,22 @@ async function authorizeDeployment(ctx: typeof context) {
   });
   expect(response.ok()).toBeTruthy();
 }
-await authorizeDeployment(context);
 const page = await context.newPage();
 try {
+  await authorizeDeployment(context);
+  const homepage = await context.request.get("/");
+  const html = await homepage.text();
+  for (const extension of ["js", "css"]) {
+    const asset = [...html.matchAll(/\/_next\/static\/[^\s"<>]+\.(?:js|css)/g)]
+      .map((match) => match[0])
+      .find((path) => path.endsWith("." + extension));
+    expect(asset, "Missing Next.js " + extension + " asset").toBeTruthy();
+    const response = await context.request.get(asset!);
+    expect(response.ok()).toBeTruthy();
+    expect(response.headers()["content-type"]).toMatch(
+      extension === "js" ? /javascript/ : /text\/css/,
+    );
+  }
   await page.goto("/demo");
   await page.getByRole("button", { name: "Explore demo", exact: true }).click();
   await expect(
