@@ -388,6 +388,9 @@ test("legacy transcripts retain company history, exact quotes and private origin
 test("demo company and signal browsing is read only", async ({ page }) => {
   await page.goto("/demo");
   await page.getByRole("button", { name: "Explore demo", exact: true }).click();
+  await expect(page.getByLabel("Demo workspace notice")).toContainText(
+    "Fictional data",
+  );
   await page.goto("/demo/customers");
   await expect(page.getByTestId("company-row")).toHaveCount(8);
   await page.getByTestId("company-row").first().click();
