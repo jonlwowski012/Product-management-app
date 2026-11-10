@@ -84,6 +84,26 @@ test("commercial boundaries enforce payment, capacity, customer keys, signatures
         .pastDueAccounts,
       1,
     );
+    const waitingJob = randomUUID();
+    await db.query(
+      "INSERT INTO jobs(id,user_id,purpose,provider,model,state,locked_at,available_at,dispatch_after) VALUES($1,$2,'extract','groq','test','processing',now()-interval '2 hours',now()+interval '1 day',now()+interval '1 day')",
+      [waitingJob, other],
+    );
+    assert.equal(
+      (await (await maintenance(healthRequest())).json()).health.stuckJobs,
+      0,
+      "A scheduled provider wait is not stuck work",
+    );
+    await db.query(
+      "UPDATE jobs SET available_at=now()-interval '1 second' WHERE id=$1",
+      [waitingJob],
+    );
+    assert.equal(
+      (await (await maintenance(healthRequest())).json()).health.stuckJobs,
+      1,
+      "An overdue job without progress must still alert",
+    );
+    await db.query("UPDATE jobs SET state='failed' WHERE id=$1", [waitingJob]);
     await paidAccount(db, user);
     await assertWritableUser(user);
     const { hashPassword, checkPassword, newSession } =

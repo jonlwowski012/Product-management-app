@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { signup, connect, api, completed, seed } from "./helpers";
+import { randomUUID, createHash } from "node:crypto";
+import { signup, connect, api, completed, seed, testDatabase } from "./helpers";
 test("Groq report citations keep company context separate from customer support", async ({
   page,
 }) => {
@@ -212,6 +213,49 @@ test("removing Groq keeps the user's OpenAI key and model selection isolated", a
   });
   expect(missing.status()).toBe(400);
   expect((await missing.json()).error).toContain("Groq API key");
+});
+test("durable quota waits save their next resume time", async ({ page }) => {
+  await signup(page);
+  const key = "test-groq-wait-" + randomUUID(),
+    model = "openai/gpt-oss-20b";
+  await api(
+    page,
+    "settings",
+    { provider: "groq", model, validation_threshold: 1, api_key: key },
+    "PATCH",
+  );
+  const source = await seed(page),
+    db = testDatabase();
+  await db.connect();
+  let jid: string | undefined;
+  try {
+    const bucket = createHash("sha256")
+      .update(key)
+      .update("\0")
+      .update(model)
+      .digest("hex");
+    await db.query("INSERT INTO groq_rate_limits(id,state) VALUES($1,$2)", [
+      bucket,
+      JSON.stringify({ events: [], blockedUntil: Date.now() + 120000 }),
+    ]);
+    jid = (await api(page, "transcripts/" + source.transcript + "/extract", {}))
+      .id;
+    await expect
+      .poll(async () => {
+        const {
+          rows: [job],
+        } = await db.query(
+          "SELECT available_at>now()+interval '30 seconds' AS scheduled FROM jobs WHERE id=$1",
+          [jid],
+        );
+        return job?.scheduled;
+      })
+      .toBe(true);
+  } finally {
+    if (jid)
+      await db.query("UPDATE jobs SET state='failed' WHERE id=$1", [jid]);
+    await db.end();
+  }
 });
 test("Groq honors Retry-After and resumes the same job", async ({ page }) => {
   test.setTimeout(120000);

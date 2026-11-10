@@ -59,15 +59,15 @@ async function rateLimited(
     const wait = await safe(jid, attempt, fn);
     if (wait) return wait;
     await query(
-      "UPDATE jobs SET error=NULL WHERE id=$1 AND dispatch_token=$2",
+      "UPDATE jobs SET error=NULL,available_at=now() WHERE id=$1 AND dispatch_token=$2",
       [jid, attempt],
     );
     return 0;
   } catch (error) {
     if (!(error instanceof GroqRateWait)) throw error;
     await query(
-      "UPDATE jobs SET error=$1,locked_at=now() WHERE id=$2 AND dispatch_token=$3",
-      [error.message, jid, attempt],
+      "UPDATE jobs SET error=$1,locked_at=now(),available_at=now()+($4::int * interval '1 second') WHERE id=$2 AND dispatch_token=$3",
+      [error.message, jid, attempt, error.seconds],
     );
     return error.seconds;
   }

@@ -30,7 +30,7 @@ export async function GET(req: Request) {
       "DELETE FROM auth_attempts WHERE created_at<now()-interval '1 day'",
     );
     const [health] = await query(`SELECT
-      (SELECT count(*)::int FROM jobs WHERE state='processing' AND locked_at<now()-interval '30 minutes') AS "stuckJobs",
+      (SELECT count(*)::int FROM jobs WHERE state='processing' AND locked_at<now()-interval '30 minutes' AND available_at<=now()) AS "stuckJobs",
       (SELECT count(*)::int FROM jobs WHERE state='failed' AND finished_at>now()-interval '1 day') AS "recentFailedJobs",
       (SELECT count(*)::int FROM storage_deletions WHERE attempts>=3) AS "storageFailures",
       (SELECT count(*)::int FROM subscriptions WHERE paid_until IS NOT NULL AND subscription_id IS NOT NULL AND status IN ('past_due','unpaid')) AS "pastDueAccounts",
