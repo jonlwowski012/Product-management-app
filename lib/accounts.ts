@@ -132,6 +132,7 @@ export async function deleteAccount(user: string, password?: string) {
     });
   await transaction(async (c) => {
     await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
+    await c.query("SET CONSTRAINTS ALL DEFERRED");
     await c.query(
       `INSERT INTO storage_deletions(pathname)
       SELECT storage_path FROM transcripts WHERE user_id=$1 AND storage_path<>''

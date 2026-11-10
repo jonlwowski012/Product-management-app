@@ -28,6 +28,15 @@ test("gemini: free model setup and discovery use Google's chat endpoint and pres
       timeout: 30000,
     })
     .toBe("succeeded");
+  const calls = await (
+    await page.request.get("http://127.0.0.1:3101/__requests")
+  ).json();
+  const request = calls.find(
+    (r: any) => r.provider === "gemini" && r.schemaKind === "report",
+  );
+  expect(request).toBeTruthy();
+  expect(request.schemaHasBounds).toBe(false);
+  expect(request.strict).toBe(true);
   const result = await api(page, "reports/" + report.id);
   expect(result.result.opportunities).toHaveLength(1);
   const workspace = await api(page, "bootstrap");

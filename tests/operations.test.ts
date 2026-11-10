@@ -56,7 +56,7 @@ test("backup restores a consistent database and verified original files into an 
     const {
       rows: [ledger],
     } = await source.query("SELECT count(*)::int AS n FROM schema_migrations");
-    assert.equal(ledger.n, 15);
+    assert.equal(ledger.n, 16);
     const user = randomUUID(),
       customer = randomUUID(),
       tid = randomUUID();

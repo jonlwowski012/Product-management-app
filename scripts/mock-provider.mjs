@@ -166,6 +166,10 @@ export function mockProvider(port = 3101, onGeneration = async () => {}) {
         max_output_tokens: body.max_output_tokens,
         reasoning: body.reasoning,
         strict: schema.strict,
+        schemaHasBounds:
+          /"(?:minLength|maxLength|minItems|maxItems|minimum|maximum)":/.test(
+            JSON.stringify(schema.schema),
+          ),
         schemaKind: schema.schema.properties?.findings
           ? "findings"
           : schema.schema.properties?.opportunities

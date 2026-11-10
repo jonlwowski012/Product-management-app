@@ -262,7 +262,7 @@ export async function generate<T>(
     );
   const key = await credentials(user, provider, client);
   const shape = jsonSchema(schema);
-  // Claude's grammar supports fewer numeric/string constraints; local validation remains authoritative.
+  // Keep provider grammars small; the full local schema still validates every bound.
   function portable(value: unknown): unknown {
     if (Array.isArray(value)) return value.map(portable);
     if (value && typeof value === "object")
@@ -301,7 +301,11 @@ export async function generate<T>(
             : {}),
           response_format: {
             type: "json_schema",
-            json_schema: { name, schema: shape, strict: true },
+            json_schema: {
+              name,
+              schema: provider === "gemini" ? portable(shape) : shape,
+              strict: true,
+            },
           },
         }
       : provider === "openai"

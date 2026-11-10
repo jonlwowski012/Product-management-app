@@ -341,6 +341,61 @@ test("commercial boundaries enforce payment, capacity, customer keys, signatures
       "INSERT INTO upload_reservations(id,user_id,filename,title,pathname,expected_size,discovery) VALUES($1,$2,'late.txt','Late upload',$3,10,true)",
       [upload, user, incoming],
     );
+    const original = (
+      await db.query(
+        "SELECT id FROM discovery_sources WHERE user_id=$1 LIMIT 1",
+        [user],
+      )
+    ).rows[0].id;
+    const root = randomUUID(),
+      child = randomUUID(),
+      company = randomUUID(),
+      product = randomUUID();
+    await db.query(
+      "INSERT INTO discovery_reports(id,user_id,input_hash) VALUES($1,$2,'root')",
+      [root, user],
+    );
+    await db.query(
+      "INSERT INTO discovery_reports(id,user_id,parent_id,recovery_root_id,recovery_of,input_hash) VALUES($1,$2,$3,$3,$3,'child')",
+      [child, user, root],
+    );
+    await db.query(
+      "INSERT INTO discovery_report_sources(user_id,report_id,source_id,role) VALUES($1,$2,$3,'customer'),($1,$4,$3,'customer')",
+      [user, root, original, child],
+    );
+    await db.query(
+      "INSERT INTO discovery_validation_work(user_id,report_id,opportunity_id,opportunity,status) VALUES($1,$2,'chosen','{}','chosen')",
+      [user, root],
+    );
+    await db.query(
+      "INSERT INTO customers(id,user_id,name) VALUES($1,$2,'Deletion fixture')",
+      [company, user],
+    );
+    await db.query(
+      "INSERT INTO research_company_aliases(user_id,name_key,company_id) VALUES($1,'deletion-fixture',$2)",
+      [user, company],
+    );
+    await db.query(
+      "INSERT INTO research_document_edits(user_id,source_id,company_id) VALUES($1,$2,$3)",
+      [user, original, company],
+    );
+    await db.query(
+      "INSERT INTO research_signal_edits(user_id,signal_key,company_id) VALUES($1,'fixture-finding',$2)",
+      [user, company],
+    );
+    await db.query(
+      "INSERT INTO products(id,user_id,name) VALUES($1,$2,'Deletion product')",
+      [product, user],
+    );
+    await db.query(
+      "INSERT INTO features(id,user_id,title,product_id) VALUES($1,$2,'Saved feature',$3)",
+      [randomUUID(), user, product],
+    );
+    await assert.rejects(
+      () => db.query("DELETE FROM discovery_sources WHERE id=$1", [original]),
+      /violates foreign key/,
+      "Ordinary source deletion must still protect saved reports",
+    );
     await db.query("UPDATE users SET deletion_requested_at=now() WHERE id=$1", [
       user,
     ]);

@@ -77,6 +77,11 @@ await database.query(
     (await readFile(
       new URL("../lib/commercial-concurrency.sql", import.meta.url),
       "utf8",
+    )) +
+    "\n" +
+    (await readFile(
+      new URL("../lib/account-deletion.sql", import.meta.url),
+      "utf8",
     )),
 );
 await database.end();
