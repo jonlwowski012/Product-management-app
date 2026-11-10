@@ -262,14 +262,14 @@ export async function generate<T>(
     );
   const key = await credentials(user, provider, client);
   const shape = jsonSchema(schema);
-  // Keep provider grammars small; the full local schema still validates every bound.
+  // Keep grammars small but enforce required/empty Gemini citation lists; local validation retains every bound.
   function portable(value: unknown): unknown {
     if (Array.isArray(value)) return value.map(portable);
     if (value && typeof value === "object")
       return Object.fromEntries(
         Object.entries(value)
           .filter(
-            ([k]) =>
+            ([k, v]) =>
               ![
                 "minimum",
                 "maximum",
@@ -277,7 +277,9 @@ export async function generate<T>(
                 "maxLength",
                 "maxItems",
                 "minItems",
-              ].includes(k),
+              ].includes(k) ||
+              (provider === "gemini" &&
+                (k === "minItems" || (k === "maxItems" && v === 0))),
           )
           .map(([k, v]) => [k, portable(v)]),
       );

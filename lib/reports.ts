@@ -847,7 +847,7 @@ export async function publishAnalysis(c: pg.PoolClient, job: any) {
     job.model,
     reportPrompt,
     payload,
-    job.provider === "groq"
+    job.provider === "groq" || job.provider === "gemini"
       ? groundedReportSchema(findings, true)
       : preciseReportSchema,
     "opportunity_report",
@@ -858,7 +858,7 @@ export async function publishAnalysis(c: pg.PoolClient, job: any) {
   try {
     result = validateReport(response.data, findings);
   } catch (e) {
-    throw new AppError((e as Error).message);
+    throw new ProviderError((e as Error).message, true);
   }
   if (!previous) result.changes = [];
   result.analysis_warnings = analysisWarnings(chunks);

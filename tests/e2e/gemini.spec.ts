@@ -11,6 +11,7 @@ test("gemini: free model setup and discovery use Google's chat endpoint and pres
     "gemini-2.5-flash",
     "gemini-3.1-flash-lite",
   ]);
+  await connect(page, "gemini", "mock-gemini-semantic-retry");
   const meta = await api(page, "flow");
   expect(meta.hasOwnKey).toBe(true);
   expect(meta.analysisProvider).toBe("gemini");
@@ -35,10 +36,18 @@ test("gemini: free model setup and discovery use Google's chat endpoint and pres
     (r: any) => r.provider === "gemini" && r.schemaKind === "report",
   );
   expect(request).toBeTruthy();
-  expect(request.schemaHasBounds).toBe(false);
+  expect(request.schemaHasPositiveMaximums).toBe(false);
   expect(request.strict).toBe(true);
+  expect(request.groundedReportCitations).toBe(true);
+  expect(request.supportingMinItems).toBe(1);
+  expect(request.contextMaxItems).toBe(0);
   const result = await api(page, "reports/" + report.id);
   expect(result.result.opportunities).toHaveLength(1);
+  expect(result.job.attempts).toBe(2);
+  expect(result.result.opportunities[0].context_ids).toEqual([]);
+  expect(result.result.opportunities[0].opposing_ids).not.toContain(
+    result.result.opportunities[0].supporting_ids[0],
+  );
   const workspace = await api(page, "bootstrap");
   expect(workspace.settings.has_gemini_key).toBe(true);
   expect(workspace.settings).not.toHaveProperty("gemini_key");

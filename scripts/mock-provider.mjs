@@ -166,8 +166,18 @@ export function mockProvider(port = 3101, onGeneration = async () => {}) {
         max_output_tokens: body.max_output_tokens,
         reasoning: body.reasoning,
         strict: schema.strict,
-        schemaHasBounds:
-          /"(?:minLength|maxLength|minItems|maxItems|minimum|maximum)":/.test(
+        groundedReportCitations: Boolean(
+          schema.schema.properties?.opportunities?.items?.properties
+            ?.supporting_ids?.items?.enum,
+        ),
+        supportingMinItems:
+          schema.schema.properties?.opportunities?.items?.properties
+            ?.supporting_ids?.minItems,
+        contextMaxItems:
+          schema.schema.properties?.opportunities?.items?.properties
+            ?.context_ids?.maxItems,
+        schemaHasPositiveMaximums:
+          /"(?:maxLength|maxItems|maximum)":[1-9]/.test(
             JSON.stringify(schema.schema),
           ),
         schemaKind: schema.schema.properties?.findings
@@ -489,6 +499,13 @@ export function mockProvider(port = 3101, onGeneration = async () => {}) {
               ]
             : [],
         };
+        if (body.model === "mock-gemini-semantic-retry") {
+          const retryKey = key + ":semantic-report";
+          const count = attempts.get(retryKey) || 0;
+          attempts.set(retryKey, count + 1);
+          if (count === 0 && supporting.length)
+            data.opportunities[0].opposing_ids = [...opposing, supporting[0]];
+        }
       } else if (isBrief) {
         const input = JSON.parse(
           provider !== "anthropic" ? body.input : body.messages[0].content,
