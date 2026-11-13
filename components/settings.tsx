@@ -35,6 +35,10 @@ export function SettingsPage({
   const [provider, setProvider] = useState(data.settings.provider);
   const [key, setKey] = useState("");
   const [message, setMessage] = useState("");
+  const [background, setBackground] = useState(
+    data.settings.product_context ?? "",
+  );
+  const [backgroundSaved, setBackgroundSaved] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [deletePassword, setDeletePassword] = useState("");
@@ -120,6 +124,49 @@ export function SettingsPage({
         <DownloadLink className="button secondary" href="/api/export">
           <Download size={16} /> Export my data
         </DownloadLink>
+      </Panel>
+      <Panel
+        title="About your product"
+        subtitle="Optional background for new discoveries."
+      >
+        <Form
+          onSubmit={async () => {
+            setBackgroundSaved(false);
+            await request(
+              "settings/product-background",
+              {
+                product_context: background,
+                previous: data.settings.product_context ?? "",
+              },
+              "PATCH",
+            );
+            await refresh();
+            setBackgroundSaved(true);
+          }}
+        >
+          <Field
+            label="Product background"
+            hint="Describe your product, who it serves, and any constraints. This guides analysis and never counts as customer evidence."
+          >
+            <textarea
+              rows={5}
+              maxLength={3000}
+              value={background}
+              placeholder="We help small teams manage projects. Our users are team leads. Solutions should work without dedicated administrators."
+              disabled={data.user.is_demo}
+              onChange={(e) => {
+                setBackground(e.target.value);
+                setBackgroundSaved(false);
+              }}
+            />
+          </Field>
+          <p>
+            You can edit or clear this background for each discovery. Saved
+            reports keep their original background.
+          </p>
+          {!data.user.is_demo && <Submit>Save product background</Submit>}
+          {backgroundSaved && <p role="status">Product background saved</p>}
+        </Form>
       </Panel>
       {!data.user.is_demo && (
         <Panel

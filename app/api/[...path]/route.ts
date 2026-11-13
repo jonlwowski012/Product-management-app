@@ -413,6 +413,24 @@ async function handle(req: NextRequest, parts: string[]) {
     const key = input.api_key ?? (await credentials(user, input.provider));
     return { models: await listModels(input.provider, key) };
   }
+  if (route === "settings/product-background" && req.method === "PATCH") {
+    const input = z
+      .object({
+        product_context: z.string().trim().max(3000),
+        previous: z.string().max(3000),
+      })
+      .parse(await body(req));
+    const saved = await query(
+      "UPDATE settings SET product_context=$1,updated_at=now() WHERE user_id=$2 AND product_context=$3 RETURNING user_id",
+      [input.product_context, user, input.previous],
+    );
+    if (!saved.length)
+      throw new AppError(
+        "Product background changed. Reload Settings before saving.",
+        409,
+      );
+    return { ok: true };
+  }
   if (route === "settings" && req.method === "PATCH") {
     const input = z
       .object({

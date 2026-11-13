@@ -1,5 +1,5 @@
 [build]
-command = "npm run build"
+command = "node scripts/netlify-build.mjs"
 publish = ".next"
 
 [build.environment]
@@ -14,6 +14,9 @@ DEPLOY_ENV = "production"
 DEPLOY_ENV = "preview"
 
 [context.branch-deploy.environment]
+DEPLOY_ENV = "preview"
+
+[context.stage.environment]
 DEPLOY_ENV = "preview"
 
 [functions]

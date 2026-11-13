@@ -184,6 +184,23 @@ export function ResearchPage({
               : "Explore recurring problems, then follow each signal back to the original words."}
           </p>
         </div>
+        {!customerPage && all && params.get("theme") && !demo && (
+          <AppLink
+            className="button primary"
+            href={
+              "/?" +
+              new URLSearchParams({
+                new: "1",
+                theme: params.get("theme")!,
+                ...(params.get("company")
+                  ? { company: params.get("company")! }
+                  : {}),
+              }).toString()
+            }
+          >
+            Explore this theme <ArrowRight size={16} />
+          </AppLink>
+        )}
         {companyId && data?.company && !demo && (
           <details className="research-actions">
             <summary aria-label="Company actions">

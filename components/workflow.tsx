@@ -79,6 +79,7 @@ export function WorkflowApp({
     [error, setError] = useState("");
   const [composing, setComposing] = useState(false),
     [question, setQuestion] = useState(""),
+    [productContext, setProductContext] = useState(""),
     [notes, setNotes] = useState(""),
     [notesRole, setNotesRole] = useState("auto"),
     [files, setFiles] = useState<File[]>([]),
@@ -140,34 +141,69 @@ export function WorkflowApp({
   }, []);
   useEffect(() => {
     let active = true;
+    setLoading(true);
     setError("");
     setEditing(null);
     void (async () => {
       try {
         const m = await request("flow");
         if (!active) return;
-        setMeta(m);
         setSignedOut(false);
         const rid = !isDiscovery
           ? null
           : (reportId ?? (!params.has("new") ? m.reports[0]?.id : null));
-        const r = rid ? await request("reports/" + rid) : null;
+        const theme =
+          isDiscovery && params.has("new") ? params.get("theme") : null;
+        const [r, exploration] = await Promise.all([
+          rid ? request("reports/" + rid) : Promise.resolve(null),
+          theme
+            ? request("library/explore", {
+                theme,
+                ...(params.get("company")
+                  ? { company: params.get("company") }
+                  : {}),
+              })
+            : Promise.resolve(null),
+        ]);
         if (!active) return;
+        if (exploration) {
+          const known = new Set(m.sources.map((s: Row) => s.id));
+          m.sources = [
+            ...m.sources,
+            ...exploration.sources.filter((s: Row) => !known.has(s.id)),
+          ];
+        }
+        setMeta(m);
         setReport(r);
         warningRef.current = r?.import_warnings ?? [];
         setWarnings(warningRef.current);
         setComposing(isDiscovery && !r);
-        setSelected([]);
+        setSelected(
+          exploration?.sources.map((s: Row) => ({ id: s.id, role: s.role })) ??
+            [],
+        );
         setNotes("");
         setFiles([]);
         setRoles({});
-        setQuestion(r?.question ?? "");
+        setQuestion(
+          r?.question ??
+            (theme
+              ? `What should we learn next about ${theme}?`.slice(0, 500)
+              : ""),
+        );
+        setProductContext(
+          r?.product_context ?? m.settings.product_context ?? "",
+        );
       } catch (e) {
         if (!active) return;
         if ((e as Error).message === "Sign in to continue") {
           setSignedOut(true);
           setMeta(null);
-        } else setError((e as Error).message);
+        } else {
+          setMeta(null);
+          setReport(null);
+          setError((e as Error).message);
+        }
       } finally {
         if (active) setLoading(false);
       }
@@ -329,7 +365,7 @@ export function WorkflowApp({
       setStage("Starting analysis…");
       const result = await request("reports", {
         question,
-        product_context: report?.product_context ?? "",
+        product_context: productContext,
         sources: unique,
         import_warnings:
           warningRef.current.length > 1000
@@ -369,23 +405,18 @@ export function WorkflowApp({
       <DemoWelcome />
     ) : (
       renderAuth(async () => {
-        const m = await request("flow");
-        const rid = !isDiscovery
-          ? null
-          : (reportId ?? (!params.has("new") ? m.reports[0]?.id : null));
-        const r = rid ? await request("reports/" + rid) : null;
-        setMeta(m);
-        setReport(r);
-        setQuestion(r?.question ?? "");
-        setComposing(isDiscovery && !r);
-        setSignedOut(false);
-        setLoading(false);
+        window.location.reload();
       })
     );
   if (!meta)
     return (
       <div className="loading">
         <p role="alert">{error}</p>
+        {params.has("theme") && (
+          <AppLink href="/signals" className="text-link">
+            Back to Signals
+          </AppLink>
+        )}
         <button
           className="button secondary"
           onClick={() => window.location.reload()}
@@ -719,6 +750,33 @@ export function WorkflowApp({
                         placeholder="Which onboarding problems should we solve first?"
                       />
                     </Field>
+                    <details>
+                      <summary>
+                        Product background
+                        {productContext ? " · included" : " · optional"}
+                      </summary>
+                      <Field
+                        label="Product background"
+                        hint="Background only, never customer evidence. Changes here apply to this discovery."
+                      >
+                        <textarea
+                          rows={4}
+                          maxLength={3000}
+                          value={productContext}
+                          onChange={(e) => setProductContext(e.target.value)}
+                        />
+                      </Field>
+                      <AppLink href="/settings" className="text-link">
+                        Manage saved background
+                      </AppLink>
+                    </details>
+                    {params.has("theme") && !report && (
+                      <p>
+                        Sources for this theme are selected below. Full
+                        documents will be analyzed, including related feedback
+                        and disagreements. Review the selection before starting.
+                      </p>
+                    )}
                     <div
                       className="flow-drop"
                       onDragOver={(e) => e.preventDefault()}

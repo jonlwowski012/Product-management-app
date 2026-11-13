@@ -2,7 +2,7 @@
 
 A private, user-owned discovery app with one default workflow: **upload transcripts → find opportunities → get a next step**. Paste notes or upload transcripts, PDFs, DOCX documents, and PPTX slides. Evidence produces up to three problem-oriented opportunities, with supporting passages, direct challenges, separate risks and context, uncertainty, and a practical validation step. Choose an opportunity, track your validation, and record what you learned. CRM is outside this release.
 
-Apply migrations through **016** with `npm run db:migrate` before running this version. Existing reports, sources, reviewed fields, recovery snapshots, and human validation work are retained.
+Apply migrations through **017** with `npm run db:migrate` before running this version. Existing reports, sources, reviewed fields, recovery snapshots, and human validation work are retained.
 
 ## Simple discovery workflow
 
@@ -30,6 +30,12 @@ Before promoting this change, run one controlled analysis in a dedicated synthet
 
 Run five individual first-use sessions without coaching. Use the fictional interviews and internal notes in `tests/fixtures/discovery-acceptance/`. Ask each person to explain what Evidence does, upload the supplied synthetic transcripts, find a problem and its next step, open its source evidence, explain a disagreement versus a risk, choose an opportunity, record an inconclusive result, and find that learning after adding material. Include a partial-analysis recovery task. Record completion, time to first useful result, misunderstandings, and assistance needed. Release only when all five recognize partial coverage and retain their learning, and at least four complete the core journey unaided. Fix and retest any misleading evidence interpretation or blocked task. These human checks remain pending until performed by real participants.
 
+### Product background and theme discovery
+
+Settings → **About your product** saves optional product background (up to 3,000 characters) for new discoveries. Expand **Product background** in a discovery to edit or clear its copy. Existing reports and their updates keep the report’s original background unless edited. Background informs synthesis, never customer evidence, and is included in private account exports and database backups.
+
+Open a Signals theme and select **Explore this theme** to start a discovery with all documents linked to visible signals in that theme selected, including opposing views. A customer filter carries through. Review or remove sources before selecting **Find opportunities**; opening the discovery makes no AI call. Whole documents are analyzed, so other feedback in them can also appear. Legacy conversation text is reused as a saved source without duplicating byte-identical imports. Hidden signals do not select documents, but hiding a signal does not redact its passage from an otherwise selected document.
+
 ### Customers and Signals
 
 Migration **011**, included in `npm run db:migrate`, adds Customers and Signals. No new AI key, provider call, or re-analysis is needed to browse existing findings.
@@ -46,7 +52,7 @@ Evidence has one plan: **$10 USD/month**, one owner and private workspace, all c
 
 Netlify is the primary deployment target. `netlify.toml` sets Node 22, private Netlify storage, Async Workloads, and separate Production/Preview environment bindings. Build and publish with the Netlify CLI as described below; the obsolete Vercel deployment workflow has been removed.
 
-Apply migrations through **016** with `npm run db:migrate` before deploying. They preserve existing data, add subscription/account records and deletion/concurrency safeguards, and enforce 1 GB of originals, 25 million extracted text characters per workspace, and one active analysis per owner. Legacy original sizes are estimated from stored pages until exact sizes are available. There are no automatic overage charges. Existing accounts are never charged automatically.
+Apply migrations through **017** with `npm run db:migrate` before deploying. They preserve existing data, add subscription/account records and deletion/concurrency safeguards, and enforce 1 GB of originals, 25 million extracted text characters per workspace, and one active analysis per owner. Legacy original sizes are estimated from stored pages until exact sizes are available. There are no automatic overage charges. Existing accounts are never charged automatically.
 
 Stripe Checkout and the customer portal manage subscriptions. Configure `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` (an active USD 1,000-cent monthly recurring price), `STRIPE_PORTAL_CONFIGURATION_ID` (the Evidence-specific cancellation configuration), and `STRIPE_WEBHOOK_SECRET` independently for Preview/sandbox and Production/live mode. Register `/api/billing/webhook` for `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, and `invoice.payment_failed`. Signature validation is required; the webhook is outside browser-session/CSRF authentication. Retries are idempotent; subscription state is fetched under a database lock rather than trusting event delivery order. Only settled invoice periods grant access, including zero-dollar invoices after a 100% discount. Checkout accepts Stripe promotion codes; older open sessions are replaced so the code field is available. Refresh payment status in Settings reconciles a delayed webhook. Configure the Stripe portal to permit cancellation at the end of the paid period, payment method changes, and invoice downloads.
 
@@ -152,6 +158,17 @@ Netlify uses the same Next.js app and Neon database, with private Netlify Blobs 
 5. The daily native schedule dispatches maintenance to a background function. Health checks read counters independently, so they fit the synchronous function limit. Automated encrypted backups use the existing `APP_URL` and `CRON_SECRET` to stream Netlify originals through the authenticated operations route. Offline Netlify restores additionally require `STORAGE_PROVIDER=netlify`, `NETLIFY_BLOBS_SITE_ID` and `NETLIFY_BLOBS_TOKEN`; keep administrative storage credentials off runtime functions and out of GitHub.
 
 Netlify Free permits commercial apps, but its monthly credits cover deployments, compute and traffic; exhaustion pauses the site. [Check current credit limits](https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/how-credits-work/) before customer launch. No paid hosting plan is required by this configuration.
+
+### Staging and production
+
+| App        | Git branch | URL                                                  | Application environment |
+| ---------- | ---------- | ---------------------------------------------------- | ----------------------- |
+| Staging    | `stage`    | https://evidence-product-discovery-stage.netlify.app | `preview`               |
+| Production | `main`     | https://evidence-product-discovery.netlify.app       | `production`            |
+
+Each app is a separate Netlify site with its own Git connection, private Blobs, secrets, and database. Staging reuses the existing preview Neon database and uses Stripe sandbox credentials. Production keeps its current Neon database and Stripe configuration. Both sites use Netlify's primary (`production`) deploy context; `DEPLOY_ENV=preview` identifies the staging application and keeps scheduled production maintenance disabled.
+
+Push changes to `stage` to deploy staging. Promote tested changes with a pull request from `stage` to `main`; merging it deploys production. Codex leaves that PR open for Jonathan to merge. Each site's build rejects the wrong branch and pull-request/branch-preview contexts, validates the environment binding, applies additive migrations, seeds the demo, and builds the app. Netlify Free applies variables to all scopes, so the build derives `DIRECT_DATABASE_URL` from the pooled Neon URL in its own process; it is not saved as a runtime variable. Runtime functions use pooled `DATABASE_URL`. Do not copy production secrets into staging.
 
 ### Retained migration compatibility
 

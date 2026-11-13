@@ -10,6 +10,7 @@ import {
   type Company,
 } from "./research-model";
 import type { DiscoverySource } from "./opportunities";
+import { MAX_DISCOVERY_FILES } from "./discovery-limits";
 
 export async function ensureResearchCompanies(
   c: pg.PoolClient,
@@ -168,6 +169,61 @@ export async function researchApi(
     ...extra,
   });
   const q = nameKey(search.get("q") ?? "");
+  if (req.method === "POST" && parts[1] === "explore") {
+    await assertWritableUser(user);
+    const input = z
+      .object({
+        theme: z.string().trim().min(1).max(300),
+        company: z.uuid().optional(),
+      })
+      .parse(await body());
+    const company = input.company ? data.root(input.company) : null;
+    if (input.company && !company) throw new AppError("Company not found", 404);
+    const keys = new Set(
+      data.signals
+        .filter(
+          (s) =>
+            !s.hidden &&
+            nameKey(s.theme) === nameKey(input.theme) &&
+            (!company || s.company_id === company),
+        )
+        .map((s) => s.kind + "/" + s.source_id),
+    );
+    const matching = documents.filter((d) => keys.has(d.kind + "/" + d.id));
+    if (!matching.length)
+      throw new AppError(
+        "This theme has no visible source material. Return to Signals and choose another theme.",
+        404,
+      );
+    if (matching.length > MAX_DISCOVERY_FILES)
+      throw new AppError(
+        "This theme has more than 1,000 documents. Open it for one customer to narrow the discovery.",
+      );
+    const sources = [];
+    for (const doc of matching) {
+      let sourceId = doc.id;
+      if (doc.kind === "transcript") {
+        const [transcript] = await query(
+          "SELECT raw_text FROM transcripts WHERE id=$1 AND user_id=$2",
+          [doc.id, user],
+        );
+        if (!transcript)
+          throw new AppError(
+            "A conversation is no longer available. Return to Signals and try again.",
+            404,
+          );
+        const { discoverySource } = await import("./reports");
+        const source = await discoverySource(
+          user,
+          doc.filename.slice(0, 190) + ".txt",
+          Buffer.from(transcript.raw_text),
+        );
+        sourceId = source.id;
+      }
+      sources.push({ id: sourceId, role: doc.role, filename: doc.filename });
+    }
+    return { sources };
+  }
   if (req.method === "GET") {
     if (parts[1] === "companies") {
       if (parts[2]) {

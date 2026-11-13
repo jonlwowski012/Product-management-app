@@ -45,7 +45,7 @@ import {
 } from "./evidence-reduction";
 import { opportunityId } from "./discovery-experience";
 
-export const REPORT_VERSION = "opportunities-6";
+export const REPORT_VERSION = "opportunities-7";
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export async function discoverySource(
   user: string,
@@ -143,7 +143,7 @@ export async function simpleMetadata(user: string) {
       [user],
     ),
     query(
-      "SELECT provider,model,validation_threshold,openai_key IS NOT NULL AS has_openai_key,anthropic_key IS NOT NULL AS has_anthropic_key,groq_key IS NOT NULL AS has_groq_key,gemini_key IS NOT NULL AS has_gemini_key FROM settings WHERE user_id=$1",
+      "SELECT provider,model,validation_threshold,product_context,openai_key IS NOT NULL AS has_openai_key,anthropic_key IS NOT NULL AS has_anthropic_key,groq_key IS NOT NULL AS has_groq_key,gemini_key IS NOT NULL AS has_gemini_key FROM settings WHERE user_id=$1",
       [user],
     ),
   ]);
@@ -371,7 +371,7 @@ function analysisWarnings(chunks: any[]) {
 }
 const createInput = z.object({
   question: z.string().trim().max(500).default(""),
-  product_context: z.string().trim().max(3000).default(""),
+  product_context: z.string().trim().max(3000).optional(),
   sources: z
     .array(
       z.object({
@@ -430,6 +430,11 @@ export async function createReport(user: string, raw: unknown) {
         throw new AppError("Choose a completed report to update.");
       previous = parent;
     }
+    const productContext =
+      input.product_context ??
+      previous?.product_context ??
+      settings.product_context ??
+      "";
     const total = sources.reduce(
       (n, s) => n + s.pages.reduce((m: number, p: any) => m + p.text.length, 0),
       0,
@@ -445,7 +450,7 @@ export async function createReport(user: string, raw: unknown) {
         provider,
         model,
         input.question,
-        input.product_context,
+        productContext,
         input.parent_id,
         input.sources.slice().sort((a, b) => a.id.localeCompare(b.id)),
       ]),
@@ -482,7 +487,7 @@ export async function createReport(user: string, raw: unknown) {
       unchanged.size === sources.length &&
       old.length === sources.length &&
       previous.question === input.question &&
-      previous.product_context === input.product_context
+      previous.product_context === productContext
     ) {
       if (input.import_warnings.length)
         await c.query(
@@ -499,7 +504,7 @@ export async function createReport(user: string, raw: unknown) {
         rid,
         user,
         input.question,
-        input.product_context,
+        productContext,
         input.parent_id,
         fingerprint,
         JSON.stringify(input.import_warnings),
