@@ -60,7 +60,11 @@ export async function api(
   input?: unknown,
   method = input ? "POST" : "GET",
 ) {
-  const r = await page.request.fetch("/api/" + path, { method, data: input });
+  const r = await page.request.fetch("/api/" + path, {
+    method,
+    data: input,
+    maxRetries: method === "GET" ? 1 : 0,
+  });
   const data = await r.json();
   expect(r.ok(), JSON.stringify(data)).toBeTruthy();
   return data;
