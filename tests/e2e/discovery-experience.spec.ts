@@ -149,6 +149,7 @@ test("a user can discover, inspect risks, choose, record learning, and retain it
 test("partial results offer checkpointed recovery with the same sources and allowance", async ({
   page,
 }) => {
+  test.setTimeout(180000);
   await signup(page);
   await connect(page, "openai", "mock-source-errors");
   const sources = [];

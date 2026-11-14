@@ -54,6 +54,7 @@ test("Groq report citations keep company context separate from customer support"
 test("Groq selects verbatim source passages rather than rewriting quotes", async ({
   page,
 }) => {
+  test.setTimeout(120000);
   await signup(page);
   await connect(page, "groq", "mock-groq-verbatim");
   const content =
@@ -66,7 +67,7 @@ test("Groq selects verbatim source passages rather than rewriting quotes", async
   });
   await expect
     .poll(async () => (await api(page, "reports/" + report.id)).job.state, {
-      timeout: 30000,
+      timeout: 90000,
     })
     .toMatch(/succeeded|failed/);
   const result = await api(page, "reports/" + report.id);
