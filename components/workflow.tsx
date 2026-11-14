@@ -700,9 +700,10 @@ export function WorkflowApp({
                       : "Turn customer conversations into product opportunities."}
                   </h1>
                   <p>
-                    Add your customer conversations and documents. Get the
-                    strongest opportunities, the evidence on both sides, and
-                    what to validate next.
+                    Add your customer conversations and documents. AI
+                    automatically suggests signals, themes, and opportunities
+                    from the evidence. Review what it found and what to validate
+                    next. No discovery question needed.
                   </p>
                 </div>
                 <ol className="flow-steps" aria-label="Discovery steps">
@@ -739,17 +740,6 @@ export function WorkflowApp({
                 )}
                 <form onSubmit={analyze} className="flow-input">
                   <fieldset disabled={busy || demo}>
-                    <Field
-                      label="What are you trying to learn?"
-                      hint="Optional. Leave blank to discover the strongest recurring problems."
-                    >
-                      <input
-                        value={question}
-                        maxLength={500}
-                        onChange={(e) => setQuestion(e.target.value)}
-                        placeholder="Which onboarding problems should we solve first?"
-                      />
-                    </Field>
                     <details>
                       <summary>
                         Product background
@@ -772,9 +762,10 @@ export function WorkflowApp({
                     </details>
                     {params.has("theme") && !report && (
                       <p>
-                        Sources for this theme are selected below. Full
-                        documents will be analyzed, including related feedback
-                        and disagreements. Review the selection before starting.
+                        Sources for <strong>{params.get("theme")}</strong> are
+                        selected below. Full documents will be analyzed,
+                        including related feedback and disagreements. Review the
+                        selection before starting.
                       </p>
                     )}
                     <div
@@ -1388,6 +1379,27 @@ export function WorkflowApp({
                     </div>
                   </div>
                 </div>
+                {result.findings.some((f) => f.origin === "customer") && (
+                  <section
+                    className="flow-suggestions"
+                    aria-label="Suggested signals and themes"
+                  >
+                    <h2>Review suggested signals and themes</h2>
+                    <p>
+                      Your analyzed customer material also feeds your signal
+                      library. Review the suggested groupings and original
+                      quotes, and correct anything that does not fit.
+                    </p>
+                    <div className="button-row">
+                      <AppLink href="/signals" className="button secondary">
+                        Review suggested themes <ArrowRight size={16} />
+                      </AppLink>
+                      <AppLink href="/signals?view=all" className="text-link">
+                        Review signals <ArrowRight size={16} />
+                      </AppLink>
+                    </div>
+                  </section>
+                )}
                 {!!result.opportunities.length && (
                   <section
                     className="flow-overview"

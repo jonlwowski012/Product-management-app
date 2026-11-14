@@ -172,8 +172,9 @@ test("explore a theme selects its full sources, opposing views and legacy notes,
   await expect(
     page.getByRole("region", { name: "Included sources" }),
   ).toContainText("Included sources (3)");
-  await expect(page.getByLabel("What are you trying to learn?")).toHaveValue(
-    `What should we learn next about ${theme}?`,
+  await expect(page.getByLabel("What are you trying to learn?")).toHaveCount(0);
+  await expect(page.locator(".flow-input")).toContainText(
+    `Sources for ${theme} are selected below.`,
   );
   const included = page.getByRole("region", { name: "Included sources" });
   await expect(included).toContainText("Acme.txt");
@@ -219,6 +220,7 @@ test("explore a theme selects its full sources, opposing views and legacy notes,
   });
   const report = await api(page, "reports/" + page.url().split("/").pop());
   expect(report.sources).toHaveLength(2);
+  expect(report.question).toBe(`What should we learn next about ${theme}?`);
   expect(report.sources.some((s: any) => s.id === sources[1].id)).toBe(false);
   await page.goto(
     "/signals?view=all&theme=" +

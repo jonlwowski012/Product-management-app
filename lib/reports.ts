@@ -45,7 +45,7 @@ import {
 } from "./evidence-reduction";
 import { opportunityId } from "./discovery-experience";
 
-export const REPORT_VERSION = "opportunities-7";
+export const REPORT_VERSION = "opportunities-8";
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export async function discoverySource(
   user: string,
