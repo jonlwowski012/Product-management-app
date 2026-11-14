@@ -36,6 +36,7 @@ try {
     ["015", "commercial-concurrency.sql"],
     ["016", "account-deletion.sql"],
     ["017", "product-background.sql"],
+    ["018", "private-beta.sql"],
   ]) {
     const sql = await readFile(
       new URL("../lib/" + file, import.meta.url),

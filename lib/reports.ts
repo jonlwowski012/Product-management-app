@@ -188,7 +188,9 @@ export async function simpleMetadata(user: string) {
     analysisReadiness: !hasOwnKey
       ? "Connect your own AI provider in Settings. Provider charges are separate."
       : !billing.active
-        ? "Subscribe for $10/month in Settings to start discovery."
+        ? billing.paymentsEnabled
+          ? "Subscribe for $10/month in Settings to start discovery."
+          : "Access requires a beta invitation."
         : "Your analysis connection is ready.",
     analysisProvider: settings[0]?.provider || "groq",
     settings: settings[0],
