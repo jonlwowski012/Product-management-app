@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { userAgreement } from "@/lib/user-agreement";
 
-export function LaunchInfo({ page }: { page: string }) {
+export function LaunchInfo({
+  page,
+  beta = false,
+}: {
+  page: string;
+  beta?: boolean;
+}) {
   const agreement = userAgreement();
   const support = agreement.contact;
   const operator = agreement.operator;
   const titles: Record<string, string> = {
-    pricing: "One plan. $10/month.",
+    pricing: beta ? "Free private beta" : "One plan. $10/month.",
     help: "Get started with Evidence",
     privacy: "Privacy and data handling",
     terms: "User Agreement",
@@ -29,8 +35,14 @@ export function LaunchInfo({ page }: { page: string }) {
             evidence.
           </p>
           <p>
-            <strong>$10 USD per month.</strong> One private workspace, one
-            owner, all current features. No free trial. Cancel anytime.
+            {beta ? (
+              "Invited testers get full access. No card required."
+            ) : (
+              <>
+                <strong>$10 USD per month.</strong> One private workspace, one
+                owner, all current features. No free trial. Cancel anytime.
+              </>
+            )}
           </p>
           <p>
             Bring your own OpenAI, Anthropic, Groq, or Gemini API key. Your
@@ -63,14 +75,19 @@ export function LaunchInfo({ page }: { page: string }) {
               Explore the demo and inspect the original quotes. All demo
               material is fictional; demo analysis is prerecorded.
             </li>
-            <li>Create an account with your email and a strong password.</li>
+            <li>
+              {beta
+                ? "Open your invitation link and create an account."
+                : "Create an account with your email and a strong password."}
+            </li>
             <li>
               Open Settings, choose your provider, and connect an API key. API
               billing and access must be enabled with that provider.
             </li>
             <li>
-              Subscribe for $10/month. AI usage is billed separately by your
-              provider.
+              {beta
+                ? "Beta access is free. Your AI provider bills usage separately."
+                : "Subscribe for $10/month. AI usage is billed separately by your provider."}
             </li>
             <li>
               Upload transcripts or paste notes. Mark internal strategy as

@@ -1,6 +1,6 @@
 import type pg from "pg";
 import { createHmac } from "node:crypto";
-import { AppError, query, transaction } from "./db";
+import { AppError, query, transaction, betaAccess } from "./db";
 import { checkPassword, hashPassword } from "./crypto";
 import { stripe, syncCustomer } from "./billing";
 
@@ -165,6 +165,7 @@ export async function expireAccount(user: string) {
     );
     if (!account || account.is_demo) return false;
     if (account.deletion_requested_at) return true;
+    if (await betaAccess(user, c)) return false;
     const {
       rows: [billing],
     } = await c.query(

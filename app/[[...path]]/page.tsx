@@ -1,3 +1,4 @@
+import { betaEnabled } from "@/lib/beta-config";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import DiscoveryApp from "@/components/discovery-app";
@@ -12,7 +13,7 @@ export default async function Page({
     path?.length === 1 &&
     ["pricing", "privacy", "terms", "help"].includes(path[0])
   )
-    return <LaunchInfo page={path[0]} />;
+    return <LaunchInfo page={path[0]} beta={betaEnabled()} />;
   const route = path?.[0] === "demo" ? path.slice(1) : (path ?? []);
   if (
     route.length &&
@@ -21,7 +22,10 @@ export default async function Page({
     redirect(path?.[0] === "demo" ? "/demo" : "/");
   return (
     <Suspense fallback={<div className="loading">Opening your workspace…</div>}>
-      <DiscoveryApp key={path?.[0] === "demo" ? "demo" : "personal"} />
+      <DiscoveryApp
+        beta={betaEnabled()}
+        key={path?.[0] === "demo" ? "demo" : "personal"}
+      />
     </Suspense>
   );
 }
