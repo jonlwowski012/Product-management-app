@@ -181,9 +181,26 @@ export function ResearchPage({
                 : pending
                   ? "Link these conversations to a company. Everything else is already available."
                   : "See who you have talked to and when."
-              : "Explore recurring problems, then follow each signal back to the original words."}
+              : "AI suggests signals and themes from your analyzed material. Review the groupings and follow each signal back to the original words."}
           </p>
         </div>
+        {!customerPage && all && params.get("theme") && !demo && (
+          <AppLink
+            className="button primary"
+            href={
+              "/?" +
+              new URLSearchParams({
+                new: "1",
+                theme: params.get("theme")!,
+                ...(params.get("company")
+                  ? { company: params.get("company")! }
+                  : {}),
+              }).toString()
+            }
+          >
+            Explore this theme <ArrowRight size={16} />
+          </AppLink>
+        )}
         {companyId && data?.company && !demo && (
           <details className="research-actions">
             <summary aria-label="Company actions">
@@ -585,9 +602,7 @@ export function ResearchPage({
                         }
                         data-testid="theme-card"
                       >
-                        <span className="eyebrow">
-                          RECURRING CUSTOMER FEEDBACK
-                        </span>
+                        <span className="eyebrow">SUGGESTED THEME</span>
                         <h2>{t.name}</h2>
                         <p>
                           {t.companies} linked compan

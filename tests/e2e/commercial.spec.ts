@@ -200,7 +200,11 @@ test("account deletion requires explicit confirmation and removes access to save
     page.getByRole("button", { name: "Create account", exact: true }),
   ).toBeVisible();
   expect(
-    (await page.request.get("/api/sources/" + source.sources[0].id)).status(),
+    (
+      await page.request.get("/api/sources/" + source.sources[0].id, {
+        maxRetries: 1,
+      })
+    ).status(),
   ).toBe(401);
 });
 

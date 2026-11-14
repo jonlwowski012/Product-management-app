@@ -2602,7 +2602,8 @@ fieldset:disabled textarea {
 .flow-report-heading .button {
   flex-shrink: 0;
 }
-.flow-summary {
+.flow-summary,
+.flow-suggestions {
   background: #eff4ed;
   border: 1px solid #dce6d8;
   border-radius: 14px;
@@ -2616,7 +2617,8 @@ fieldset:disabled textarea {
   color: #52684c;
   text-transform: uppercase;
 }
-.flow-summary > p {
+.flow-summary > p,
+.flow-suggestions > p {
   color: #344a38;
   font-size: 16px;
   line-height: 1.8;
@@ -2875,7 +2877,8 @@ fieldset:disabled textarea {
   .flow-report-heading h1 {
     font-size: 29px;
   }
-  .flow-summary {
+  .flow-summary,
+  .flow-suggestions {
     padding: 20px;
   }
   .flow-opportunity {
@@ -2910,6 +2913,7 @@ fieldset:disabled textarea {
   }
 }
 @media print {
+  .flow-suggestions,
   .flow-overview,
   .flow-choose,
   .flow-validation form,

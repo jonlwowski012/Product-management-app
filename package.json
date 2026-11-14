@@ -12,7 +12,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "demo:seed": "tsx scripts/seed-demo.ts",
     "typecheck": "tsc --noEmit",
-    "test:unit": "tsx --test tests/unit.test.ts tests/workflow.test.ts tests/groq-limits.test.ts tests/research.test.ts tests/discovery-experience.test.ts tests/netlify.test.ts tests/netlify-workflow.test.ts",
+    "test:unit": "tsx --test tests/unit.test.ts tests/workflow.test.ts tests/groq-limits.test.ts tests/research.test.ts tests/discovery-experience.test.ts tests/netlify.test.ts tests/netlify-workflow.test.ts tests/deployment.test.mjs tests/api-request.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test": "npm run typecheck && npm run test:unit && npm run test:ops && npm run test:e2e",

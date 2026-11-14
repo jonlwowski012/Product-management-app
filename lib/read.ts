@@ -55,7 +55,7 @@ export async function bootstrap(user: string) {
       [user],
     ),
     query(
-      "SELECT provider,model,validation_threshold,openai_key IS NOT NULL AS has_openai_key,anthropic_key IS NOT NULL AS has_anthropic_key,groq_key IS NOT NULL AS has_groq_key,gemini_key IS NOT NULL AS has_gemini_key FROM settings WHERE user_id=$1",
+      "SELECT provider,model,validation_threshold,product_context,openai_key IS NOT NULL AS has_openai_key,anthropic_key IS NOT NULL AS has_anthropic_key,groq_key IS NOT NULL AS has_groq_key,gemini_key IS NOT NULL AS has_gemini_key FROM settings WHERE user_id=$1",
       [user],
     ),
   ]);

@@ -73,7 +73,7 @@ test("backup restores a consistent database and verified original files into an 
     const {
       rows: [ledger],
     } = await source.query("SELECT count(*)::int AS n FROM schema_migrations");
-    assert.equal(ledger.n, 16);
+    assert.equal(ledger.n, 17);
     const user = randomUUID(),
       customer = randomUUID(),
       tid = randomUUID();
@@ -89,6 +89,10 @@ test("backup restores a consistent database and verified original files into an 
     await source.query(
       "INSERT INTO users(id,email,name,password_hash) VALUES($1,$2,$3,$4)",
       [user, "ops@example.com", "Operations", "fixture-not-for-login"],
+    );
+    await source.query(
+      "INSERT INTO settings(user_id,product_context) VALUES($1,$2)",
+      [user, "A simple project tracker for small teams."],
     );
     await source.query(
       "INSERT INTO customers(id,user_id,name) VALUES($1,$2,$3)",
@@ -214,6 +218,15 @@ test("backup restores a consistent database and verified original files into an 
     });
     assert.equal(run.status, 0, run.stderr);
     await restored.connect();
+    assert.equal(
+      (
+        await restored.query(
+          "SELECT product_context FROM settings WHERE user_id=$1",
+          [user],
+        )
+      ).rows[0].product_context,
+      "A simple project tracker for small teams.",
+    );
     const { rows } = await restored.query(
       "SELECT raw_text,sha256,storage_path FROM transcripts",
     );

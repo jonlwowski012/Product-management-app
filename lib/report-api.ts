@@ -6,6 +6,7 @@ import type { NextRequest } from "next/server";
 import { AppError, query, transaction, assertWritableUser } from "./db";
 import {
   simpleMetadata,
+  savedSources,
   discoverySource,
   createReport,
   reportDetail,
@@ -25,6 +26,15 @@ export async function reportApi(
   if (req.method !== "GET") await assertWritableUser(user);
   const route = parts.join("/");
   if (route === "flow" && req.method === "GET") return simpleMetadata(user);
+  if (route === "sources" && req.method === "GET") {
+    const input = z
+      .object({
+        q: z.string().max(200).default(""),
+        offset: z.coerce.number().int().min(0).max(100000000).default(0),
+      })
+      .parse(Object.fromEntries(req.nextUrl.searchParams));
+    return savedSources(user, input.q, input.offset);
+  }
   if (route === "sources" && req.method === "POST") {
     const sources = [];
     const warnings: string[] = [];
