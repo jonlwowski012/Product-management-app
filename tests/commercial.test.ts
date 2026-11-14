@@ -7,6 +7,7 @@ import { mkdtemp, mkdir, writeFile, access, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { setTimeout as delay } from "node:timers/promises";
 test("commercial boundaries enforce payment, capacity, customer keys, signatures, and deletion", async () => {
   const previous = { ...process.env };
   const base = new URL(process.env.DATABASE_URL!);
@@ -520,7 +521,20 @@ test("commercial boundaries enforce payment, capacity, customer keys, signatures
     await pool?.end();
     process.env = previous;
     await db.end();
-    await admin.query(`DROP DATABASE "${name}" WITH (FORCE)`);
-    await admin.end();
+    try {
+      // PostgreSQL can still be closing a socket after the client disconnects.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await admin.query(`DROP DATABASE "${name}"`);
+          break;
+        } catch (error) {
+          if ((error as { code?: string }).code !== "55006" || attempt >= 4)
+            throw error;
+          await delay(100);
+        }
+      }
+    } finally {
+      await admin.end();
+    }
   }
 });
