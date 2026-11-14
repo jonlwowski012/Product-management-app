@@ -1,3 +1,4 @@
+import { dropTestDatabase } from "./fixtures/drop-test-database";
 import "dotenv/config";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -159,7 +160,6 @@ test("recovery passes sleeping owners and preserves healthy runs and newly due q
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await db.end();
-    await admin.query(`DROP DATABASE "${name}" WITH(FORCE)`);
-    await admin.end();
+    await dropTestDatabase(admin, name);
   }
 });

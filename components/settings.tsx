@@ -168,7 +168,17 @@ export function SettingsPage({
           {backgroundSaved && <p role="status">Product background saved</p>}
         </Form>
       </Panel>
-      {!data.user.is_demo && (
+      {!data.user.is_demo && data.billing?.paymentsEnabled === false && (
+        <Panel title="Private beta">
+          <p>
+            {data.billing.beta
+              ? "Your complimentary beta access is active."
+              : "Access requires a beta invitation."}{" "}
+            Your AI provider bills usage separately.
+          </p>
+        </Panel>
+      )}
+      {!data.user.is_demo && data.billing?.paymentsEnabled !== false && (
         <Panel
           title="Subscription"
           subtitle="$10/month · all features · no free trial"

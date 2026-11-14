@@ -1,4 +1,5 @@
 import pg from "pg";
+import { betaEnabled } from "./beta-config";
 import { randomUUID } from "node:crypto";
 const g = globalThis as unknown as { discoveryPool?: pg.Pool };
 export const pool =
@@ -78,8 +79,18 @@ export async function assertPersonalUser(user: string, client?: pg.PoolClient) {
   if (!row || row.is_demo || row.deletion_requested_at)
     throw new AppError("The demo workspace is read only", 403);
 }
+export async function betaAccess(user: string, client?: pg.PoolClient) {
+  if (!betaEnabled()) return false;
+  const sql =
+    "SELECT 1 FROM beta_invitations WHERE user_id=$1 AND claimed_at IS NOT NULL";
+  const rows = client
+    ? (await client.query(sql, [user])).rows
+    : await query(sql, [user]);
+  return rows.length > 0;
+}
 export async function assertWritableUser(user: string, client?: pg.PoolClient) {
   await assertPersonalUser(user, client);
+  if (await betaAccess(user, client)) return;
   const sql =
     "SELECT s.paid_until FROM users u LEFT JOIN subscriptions s ON s.user_id=u.id WHERE u.id=$1";
   const [row] = client
@@ -92,6 +103,7 @@ export async function assertWritableUser(user: string, client?: pg.PoolClient) {
     );
 }
 export async function assertReadableUser(user: string) {
+  if (await betaAccess(user)) return;
   const [row] = await query(
     "SELECT paid_until FROM subscriptions WHERE user_id=$1",
     [user],

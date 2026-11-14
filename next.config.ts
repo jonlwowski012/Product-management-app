@@ -30,7 +30,7 @@ const config: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           {
             key: "Content-Security-Policy",
-            value: `default-src 'self'; script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${process.env.E2E_TEST_MODE === "1" && process.env.NODE_ENV === "development" ? "https://vercel.com/api/blob/ https://*.blob.vercel-storage.com http://127.0.0.1:3102" : ""}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
+            value: `default-src 'self'; script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${process.env.VERCEL === "1" ? "https://vercel.com/api/blob/ https://*.blob.vercel-storage.com" : ""} ${process.env.E2E_TEST_MODE === "1" && process.env.NODE_ENV === "development" ? "https://vercel.com/api/blob/ https://*.blob.vercel-storage.com http://127.0.0.1:3102" : ""}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
           },
         ],
       },

@@ -203,3 +203,33 @@ Use Node 22 for all commands. `npm run test:ops` includes commercial boundaries 
 `npm run health` reads authenticated health counters and fails for stuck processing jobs, recent failed analyses, repeated storage cleanup failures, or past-due accounts. Workflow failures are the operator alert. Never include source content, passwords, keys, or raw provider error bodies in monitoring. Monitor Netlify credits and Neon usage before committing publicly to the capacity limits. Netlify remains on Free with automatic top-ups disabled; credit exhaustion pauses the app. No paid hosting upgrade has been made.
 
 Pending real-world gates: a hosted restore drill, an actual live card payment with a Stripe-delivered paid-invoice webhook, five uncoached human sessions using `tests/fixtures/discovery-acceptance/`, reviewed business/policy details, and a five-customer paid pilot. Automated synthetic checks cannot stand in for those sessions. Keep production sales closed until the applicable gates are completed. Email features and a custom domain remain explicitly deferred.
+
+### Private beta on Vercel
+
+Use the separate Evidence project. Set its production branch to `main` and assign
+`evidence.jonathanlwowski.com` to production. Assign
+`stage-evidence.jonathanlwowski.com` to the `stage` preview branch. Confirm the
+Vercel plan covers an invited beta for a future paid product before enabling it.
+
+- Configure `BETA_MODE=true`, `JOB_RUNNER=workflow`, secure cookies, the matching
+  `APP_URL` and `DEPLOY_ENV`, and the required database, application, and billing
+  variables for each environment. Use separate Neon databases and private Blob
+  stores. Leave `STORAGE_PROVIDER` unset on Vercel. Keep the source database's
+  `APP_SECRET` when migrating it so saved AI keys can still decrypt.
+- Use Stripe sandbox credentials and a sandbox webhook at each target's
+  `/api/billing/webhook`. Test checkout on isolated staging with beta mode
+  disabled and sandbox credentials. Beta mode disables checkout and the billing
+  portal and rejects live Stripe credentials and events. At launch, switch
+  production to live credentials and disable beta mode together.
+- To migrate workspaces and originals from Netlify, make a verified encrypted
+  backup and restore into an empty Neon database using the target's private
+  Vercel Blob credentials. Rehearse this on staging before stopping writes to
+  take the final production snapshot. Keep the source and target backups and
+  update the operations URL after validating the new deployment.
+- After the beta migrations run, set `BETA_MODE=true`, `APP_URL`, and
+  `DIRECT_DATABASE_URL` locally for the target environment. Run
+  `npx tsx scripts/beta-invitations.ts /absolute/path/to/private-invitations.txt`.
+  Share one link per tester. Each link works once, and the database limits
+  issuance to ten slots per environment. A beta participant uses their own AI
+  provider key. Beta access ends when beta mode is disabled. Participants keep
+  their accounts and can choose whether to subscribe.

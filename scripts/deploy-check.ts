@@ -18,10 +18,12 @@ for (const name of [
     throw new Error("Missing deployment variable: " + name);
 }
 if (
-  target === "preview" &&
-  /^(sk|rk)_live_/.test(process.env.STRIPE_SECRET_KEY || "")
+  (target === "preview" || process.env.BETA_MODE === "true") &&
+  !/^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY || "")
 )
-  throw new Error("Preview requires Stripe sandbox credentials");
+  throw new Error(
+    "Preview and private beta require Stripe sandbox credentials",
+  );
 if (
   target === "production" &&
   (!process.env.SUPPORT_EMAIL || !process.env.LEGAL_OPERATOR_NAME)
@@ -46,7 +48,16 @@ for (const name of [
 ])
   if (process.env[name])
     throw new Error("Remove local/test setting before deployment: " + name);
-if (
+if (process.env.VERCEL === "1") {
+  if (
+    process.env.STORAGE_PROVIDER === "netlify" ||
+    process.env.JOB_RUNNER !== "workflow" ||
+    !process.env.BLOB_READ_WRITE_TOKEN
+  )
+    throw new Error(
+      "Vercel requires private Blob storage and the Workflow job runner",
+    );
+} else if (
   process.env.STORAGE_PROVIDER !== "netlify" ||
   process.env.JOB_RUNNER !== "netlify" ||
   (process.env.AWL_API_KEY?.length ?? 0) < 32

@@ -1,3 +1,4 @@
+import { dropTestDatabase } from "./fixtures/drop-test-database";
 import { paidAccount } from "./fixtures/paid-account";
 import "dotenv/config";
 import { test } from "node:test";
@@ -182,7 +183,6 @@ test("local worker continues after multiple Groq document failures without exhau
     await globals.discoveryPool?.end();
     process.env = oldEnv;
     await db.end();
-    await admin.query(`DROP DATABASE "${name}" WITH (FORCE)`);
-    await admin.end();
+    await dropTestDatabase(admin, name);
   }
 });

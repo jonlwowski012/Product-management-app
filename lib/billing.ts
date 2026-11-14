@@ -1,10 +1,19 @@
 import Stripe from "stripe";
-import { AppError, query, transaction } from "./db";
+import { betaEnabled } from "./beta-config";
+import { AppError, query, transaction, betaAccess } from "./db";
 import type pg from "pg";
 
 export const MONTHLY_PRICE_CENTS = 1000;
 export const READ_ONLY_DAYS = 30;
 export function stripe() {
+  if (
+    betaEnabled() &&
+    !/^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY || "")
+  )
+    throw new AppError(
+      "Only Stripe test-mode credentials are allowed during the private beta",
+      503,
+    );
   if (!process.env.STRIPE_SECRET_KEY)
     throw new AppError(
       "Subscriptions are temporarily unavailable. Please try again later.",
@@ -45,20 +54,26 @@ export async function billingStatus(user: string) {
     "SELECT u.deletion_requested_at,s.status,s.paid_until,s.cancel_at_period_end,s.customer_id IS NOT NULL AS has_customer FROM users u LEFT JOIN subscriptions s ON s.user_id=u.id WHERE u.id=$1",
     [user],
   );
+  const beta = !row?.deletion_requested_at && (await betaAccess(user));
   return {
-    active: paidAccess(row?.paid_until, !!row?.deletion_requested_at),
+    beta,
+    paymentsEnabled: !betaEnabled(),
+    active: beta || paidAccess(row?.paid_until, !!row?.deletion_requested_at),
     status: row?.status || "unpaid",
     paidUntil: row?.paid_until ?? null,
     cancelAtPeriodEnd: row?.cancel_at_period_end ?? false,
     hasCustomer: row?.has_customer ?? false,
-    readUntil: row?.paid_until
-      ? new Date(
-          new Date(row.paid_until).getTime() + READ_ONLY_DAYS * 86400000,
-        ).toISOString()
-      : null,
+    readUntil:
+      !beta && row?.paid_until
+        ? new Date(
+            new Date(row.paid_until).getTime() + READ_ONLY_DAYS * 86400000,
+          ).toISOString()
+        : null,
   };
 }
 export async function checkout(user: string) {
+  if (betaEnabled())
+    throw new AppError("The private beta is free. Checkout is disabled.", 403);
   if (
     process.env.DEPLOY_ENV === "preview" &&
     /^(sk|rk)_live_/.test(process.env.STRIPE_SECRET_KEY || "")
@@ -173,6 +188,8 @@ export async function checkout(user: string) {
   });
 }
 export async function portal(user: string) {
+  if (betaEnabled())
+    throw new AppError("Payments are disabled during the private beta.", 403);
   const [billing] = await query(
     "SELECT customer_id FROM subscriptions WHERE user_id=$1",
     [user],
@@ -258,6 +275,11 @@ export async function reconcile(user: string) {
   return billingStatus(user);
 }
 export async function processBillingEvent(event: Stripe.Event) {
+  if (betaEnabled() && event.livemode)
+    throw new AppError(
+      "Live billing events are disabled during the private beta.",
+      403,
+    );
   const supported = new Set([
     "checkout.session.completed",
     "customer.subscription.created",
