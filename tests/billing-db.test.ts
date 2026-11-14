@@ -1,3 +1,4 @@
+import { dropTestDatabase } from "./fixtures/drop-test-database";
 import "dotenv/config";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -408,7 +409,6 @@ test("checkout renewal and expiry preserve sessions, payments, and owner locking
     await db.end();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     process.env = previous;
-    await admin.query(`DROP DATABASE "${name}" WITH (FORCE)`);
-    await admin.end();
+    await dropTestDatabase(admin, name);
   }
 });

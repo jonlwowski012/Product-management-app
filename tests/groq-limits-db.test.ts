@@ -1,3 +1,4 @@
+import { dropTestDatabase } from "./fixtures/drop-test-database";
 import "dotenv/config";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -128,7 +129,6 @@ test("Groq budgets serialize concurrent workers, survive rollbacks, and honor pr
       .discoveryPool;
     if (appPool) await appPool.end();
     await db.end();
-    await admin.query(`DROP DATABASE "${name}" WITH (FORCE)`);
-    await admin.end();
+    await dropTestDatabase(admin, name);
   }
 });
