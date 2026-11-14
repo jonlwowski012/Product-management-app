@@ -45,7 +45,7 @@ import {
 } from "./evidence-reduction";
 import { opportunityId } from "./discovery-experience";
 
-export const REPORT_VERSION = "opportunities-7";
+export const REPORT_VERSION = "opportunities-8";
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export async function discoverySource(
   user: string,
@@ -132,16 +132,44 @@ export async function discoveryUpload(
     });
   return { sources, warnings };
 }
+export async function savedSources(
+  user: string,
+  search = "",
+  offset = 0,
+  limit = 50,
+) {
+  const [sources, [count]] = await Promise.all([
+    query(
+      `SELECT s.id,s.filename,s.sha256,
+      coalesce((SELECT rs.role FROM discovery_report_sources rs
+        JOIN discovery_reports r ON r.id=rs.report_id AND r.user_id=rs.user_id
+        WHERE rs.source_id=s.id AND rs.user_id=$1
+        ORDER BY r.created_at DESC,r.id DESC LIMIT 1),s.role) AS role,
+      s.warnings,s.created_at,jsonb_array_length(s.pages) AS pages,
+      (SELECT coalesce(sum(length(p->>'text')),0)::int FROM jsonb_array_elements(s.pages) p) AS characters
+    FROM discovery_sources s WHERE s.user_id=$1 AND strpos(lower(s.filename),lower($2))>0
+    ORDER BY s.created_at DESC,s.id DESC LIMIT $3 OFFSET $4`,
+      [user, search, limit, offset],
+    ),
+    query(
+      "SELECT count(*)::int AS total FROM discovery_sources WHERE user_id=$1 AND strpos(lower(filename),lower($2))>0",
+      [user, search],
+    ),
+  ]);
+  return {
+    sources,
+    total: count.total,
+    next:
+      offset + sources.length < count.total ? offset + sources.length : null,
+  };
+}
 export async function simpleMetadata(user: string) {
   const [reports, sources, settings] = await Promise.all([
     query(
       "SELECT r.id,r.question,r.created_at,r.result IS NOT NULL AS ready,coalesce(r.result->>'summary','') AS summary FROM discovery_reports r WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT 100",
       [user],
     ),
-    query(
-      "SELECT id,filename,sha256,role,warnings,created_at,jsonb_array_length(pages) AS pages,(SELECT coalesce(sum(length(p->>'text')),0)::int FROM jsonb_array_elements(pages) p) AS characters FROM discovery_sources WHERE user_id=$1 ORDER BY created_at DESC LIMIT 5000",
-      [user],
-    ),
+    savedSources(user, "", 0, 5000),
     query(
       "SELECT provider,model,validation_threshold,product_context,openai_key IS NOT NULL AS has_openai_key,anthropic_key IS NOT NULL AS has_anthropic_key,groq_key IS NOT NULL AS has_groq_key,gemini_key IS NOT NULL AS has_gemini_key FROM settings WHERE user_id=$1",
       [user],
@@ -153,7 +181,8 @@ export async function simpleMetadata(user: string) {
     !billing.readUntil || new Date(billing.readUntil).getTime() > Date.now();
   return {
     reports: retained ? reports : [],
-    sources: retained ? sources : [],
+    sources: retained ? sources.sources : [],
+    sources_total: retained ? sources.total : 0,
     billing,
     analysisReady: hasOwnKey && billing.active,
     analysisReadiness: !hasOwnKey

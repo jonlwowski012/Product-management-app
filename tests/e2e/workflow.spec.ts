@@ -40,9 +40,7 @@ test("one action analyzes untimestamped notes without customer or provider setup
   await expect(
     page.getByRole("link", { name: "Features", exact: true }),
   ).toHaveCount(0);
-  await page
-    .getByLabel("What are you trying to learn?")
-    .fill("What is delaying adoption?");
+  await expect(page.getByLabel("What are you trying to learn?")).toHaveCount(0);
   await page
     .getByLabel("Or paste customer notes")
     .fill(
@@ -53,6 +51,7 @@ test("one action analyzes untimestamped notes without customer or provider setup
     .getByRole("button", { name: "Find opportunities", exact: true })
     .click();
   const rid = await ready(page);
+  await expect(page.locator(".flow-summary")).toHaveCount(1);
   await expect(page.getByTestId("opportunity-card")).toHaveCount(1);
   const card = page.getByTestId("opportunity-card");
   await expect(card).toContainText("Interview three customer owners");
@@ -81,6 +80,21 @@ test("one action analyzes untimestamped notes without customer or provider setup
   expect(workspace.features).toHaveLength(0);
   const report = await api(page, "reports/" + rid);
   expect(report.job.billing_mode).toBe("byok");
+  expect(report.question).toBe("");
+  await page
+    .getByRole("link", { name: "Review suggested themes", exact: true })
+    .click();
+  await expect(page.getByTestId("theme-card")).toHaveCount(1);
+  await expect(page.getByTestId("theme-card")).toContainText(
+    "Make approval changes easier to explain",
+  );
+  await page.getByTestId("theme-card").click();
+  await expect(page.getByTestId("research-signal")).toHaveCount(2);
+  await expect(
+    page
+      .getByTestId("research-signal")
+      .filter({ hasText: "We do not need detailed audit history" }),
+  ).toHaveCount(1);
 });
 test("mixed PDF, slides and DOCX upload preserves citations and keeps context out of support", async ({
   page,
