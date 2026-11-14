@@ -30,6 +30,7 @@ import {
   MAX_DISCOVERY_BYTES,
 } from "@/lib/discovery-limits";
 import { AppLink, DownloadLink, request, Modal, Field } from "./ui";
+import { SavedMaterial } from "./saved-material";
 import { DemoWelcome } from "./demo";
 import { SettingsPage } from "./settings";
 import { ValidationWork, EarlierValidationWork } from "./validation-work";
@@ -85,6 +86,7 @@ export function WorkflowApp({
     [files, setFiles] = useState<File[]>([]),
     [roles, setRoles] = useState<Record<string, string>>({}),
     [selected, setSelected] = useState<Selection[]>([]),
+    [reuseReportId, setReuseReportId] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
     [stage, setStage] = useState("");
   const [source, setSource] = useState<SourceSelection | null>(null),
@@ -179,9 +181,12 @@ export function WorkflowApp({
         setWarnings(warningRef.current);
         setComposing(isDiscovery && !r);
         setSelected(
-          exploration?.sources.map((s: Row) => ({ id: s.id, role: s.role })) ??
-            [],
+          (
+            exploration?.sources ??
+            (!r && m.sources_total <= MAX_DISCOVERY_FILES ? m.sources : [])
+          ).map((s: Row) => ({ id: s.id, role: s.role })),
         );
+        setReuseReportId(m.reports.find((item: Row) => item.ready)?.id ?? null);
         setNotes("");
         setFiles([]);
         setRoles({});
@@ -374,7 +379,7 @@ export function WorkflowApp({
                 `${warningRef.current.length - 1000} additional files were skipped.`,
               ]
             : warningRef.current,
-        parent_id: report?.result ? report.id : null,
+        parent_id: report?.result ? report.id : reuseReportId,
       });
       setNotes("");
       setFiles([]);
@@ -768,6 +773,44 @@ export function WorkflowApp({
                         selection before starting.
                       </p>
                     )}
+                    <p>
+                      Transcripts are saved privately and reused for future
+                      discoveries, signals, and themes. Upload each transcript
+                      once; add only new material here.
+                    </p>
+                    {meta.sources_total > 0 && (
+                      <SavedMaterial
+                        total={meta.sources_total}
+                        selected={selected}
+                        disabled={busy || demo}
+                        onToggle={(item) => {
+                          setMeta(
+                            (m: Row | null) =>
+                              m && {
+                                ...m,
+                                sources: m.sources.some(
+                                  (s: Row) => s.id === item.id,
+                                )
+                                  ? m.sources
+                                  : [...m.sources, item],
+                              },
+                          );
+                          setSelected((current) =>
+                            current.some((s) => s.id === item.id)
+                              ? current.filter((s) => s.id !== item.id)
+                              : [...current, { id: item.id, role: item.role }],
+                          );
+                        }}
+                      />
+                    )}
+                    {!report &&
+                      !params.has("theme") &&
+                      meta.sources_total > MAX_DISCOVERY_FILES && (
+                        <p>
+                          Choose up to 1,000 saved documents for this analysis.
+                          Your other documents remain saved.
+                        </p>
+                      )}
                     <div
                       className="flow-drop"
                       onDragOver={(e) => e.preventDefault()}
@@ -938,7 +981,7 @@ export function WorkflowApp({
                         <h2>Included sources ({selected.length})</h2>
                         <p>
                           These saved documents will be included in this
-                          analysis.
+                          analysis. You do not need to upload them again.
                         </p>
                         {selected.slice(0, visibleSources).map((item) => (
                           <div className="flow-file" key={item.id}>
