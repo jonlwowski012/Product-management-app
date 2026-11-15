@@ -1,3 +1,4 @@
+import { beginDirectSourceWrite } from "./source-write";
 import {
   deleteDiscoverySource,
   sourceDeletionImpact,
@@ -45,6 +46,7 @@ export async function reportApi(
     return savedSources(user, input.q, input.offset);
   }
   if (route === "sources" && req.method === "POST") {
+    const origin = await beginDirectSourceWrite();
     const sources = [];
     const warnings: string[] = [];
     if (req.headers.get("content-type")?.includes("multipart/form-data")) {
@@ -80,7 +82,14 @@ export async function reportApi(
       }
       for (const file of documents) {
         sources.push({
-          ...(await discoverySource(user, file.name, file.buffer)),
+          ...(await discoverySource(
+            user,
+            file.name,
+            file.buffer,
+            null,
+            null,
+            origin,
+          )),
           bytes: file.buffer.length,
         });
       }
@@ -92,7 +101,14 @@ export async function reportApi(
         })
         .parse(await body());
       sources.push(
-        await discoverySource(user, input.filename, Buffer.from(input.content)),
+        await discoverySource(
+          user,
+          input.filename,
+          Buffer.from(input.content),
+          null,
+          null,
+          origin,
+        ),
       );
     }
     return { sources, warnings };
@@ -113,9 +129,13 @@ export async function reportApi(
       return sourceDeletionStatus(user, sid);
     if (req.method === "DELETE" && parts.length === 2) {
       const input = z
-        .object({ reportIds: z.array(z.uuid()).max(10000) })
+        .object({
+          reportIds: z.array(z.uuid()).max(10000),
+          briefIds: z.array(z.uuid()).optional(),
+          signals: z.int().nonnegative().optional(),
+        })
         .parse(await body());
-      const deleted = await deleteDiscoverySource(user, sid, input.reportIds);
+      const deleted = await deleteDiscoverySource(user, sid, input);
       if (deleted.pending)
         after(() => cleanStorage(deleted.receipt).catch(() => {}));
       return deleted;
@@ -238,6 +258,7 @@ export async function reportApi(
           409,
         );
       await transaction(async (c) => {
+        await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
         const { rows } = await c.query(
           "UPDATE jobs SET state='queued',attempts=CASE WHEN attempts>=3 THEN 1 ELSE attempts+1 END,error=NULL,workflow_run_id=NULL,dispatch_after=now(),dispatch_token=NULL,finished_at=NULL,available_at=now() WHERE id=$1 AND user_id=$2 AND state='failed' AND (attempts<3 OR error=$3) RETURNING id",
           [

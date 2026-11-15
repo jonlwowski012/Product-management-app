@@ -1,10 +1,7 @@
 import "dotenv/config";
 import pg from "pg";
 import { pool, query } from "../lib/db";
-import {
-  deleteDiscoverySource,
-  sourceDeletionImpact,
-} from "../lib/source-deletion";
+import { deleteDiscoverySource } from "../lib/source-deletion";
 import { cleanStorage } from "../lib/storage";
 
 async function replay() {
@@ -40,34 +37,29 @@ async function replay() {
         "The restore and ledger must belong to the same environment.",
       );
     const { rows: receipts } = await ledger.query(
-      "SELECT DISTINCT user_id,entity_id FROM audit WHERE action='source.deleted' AND entity_type='source' AND entity_id IS NOT NULL",
+      "SELECT DISTINCT user_id,entity_id FROM audit WHERE entity_id IS NOT NULL AND ((action='source.deleted' AND entity_type='source') OR (action='Transcript and supporting evidence removed' AND entity_type='transcript'))",
     );
     let removed = 0;
     for (const receipt of receipts) {
       const [exists] = await query(
-        "SELECT 1 FROM discovery_sources WHERE user_id=$1 AND id=$2",
+        "SELECT 1 FROM discovery_sources WHERE user_id=$1 AND id=$2 UNION ALL SELECT 1 FROM transcripts WHERE user_id=$1 AND id=$2",
         [receipt.user_id, receipt.entity_id],
       );
       if (!exists) continue;
-      const impact = await sourceDeletionImpact(
-        receipt.user_id,
-        receipt.entity_id,
-      );
-      const deleted = await deleteDiscoverySource(
-        receipt.user_id,
-        receipt.entity_id,
-        impact.reportIds,
-      );
-      await cleanStorage(deleted.receipt);
-      const [queued] = await query(
-        "SELECT 1 FROM storage_deletions WHERE source_deletion_id=$1",
-        [deleted.receipt],
-      );
-      if (queued) throw new Error("Restore file cleanup is incomplete.");
+      await deleteDiscoverySource(receipt.user_id, receipt.entity_id, null);
       removed++;
     }
+    // The database is offline during replay, so each rerun can attempt cleanup immediately.
+    await query(
+      "UPDATE storage_deletions SET not_before=now() WHERE cardinality(source_deletion_ids)>0 AND attempts>0",
+    );
+    const pendingReceipts = await query(
+      "SELECT DISTINCT unnest(source_deletion_ids) AS source_deletion_id FROM storage_deletions",
+    );
+    for (const { source_deletion_id } of pendingReceipts)
+      while ((await cleanStorage(source_deletion_id)) === 50) {}
     const [pending] = await query(
-      "SELECT 1 FROM storage_deletions WHERE source_deletion_id IS NOT NULL LIMIT 1",
+      "SELECT 1 FROM storage_deletions WHERE cardinality(source_deletion_ids)>0 LIMIT 1",
     );
     if (pending) throw new Error("Restore file cleanup is incomplete.");
     console.log(

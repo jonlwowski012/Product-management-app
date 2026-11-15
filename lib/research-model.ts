@@ -55,7 +55,11 @@ export function documentLabels(header: string) {
       : null;
   return { company, date };
 }
-export function signalKey(f: Finding, kind: string, fingerprint?: string) {
+export function signalKey(
+  f: Pick<Finding, "source_id" | "page_index" | "source_start" | "quote">,
+  kind: string,
+  fingerprint?: string,
+) {
   return createHash("sha256")
     .update(
       [

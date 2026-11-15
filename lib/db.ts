@@ -117,7 +117,12 @@ export async function assertReadableUser(user: string) {
       410,
     );
 }
-export async function owned(table: string, recordId: string, user: string) {
+export async function owned(
+  table: string,
+  recordId: string,
+  user: string,
+  client?: pg.PoolClient,
+) {
   if (
     ![
       "customers",
@@ -132,10 +137,11 @@ export async function owned(table: string, recordId: string, user: string) {
     ].includes(table)
   )
     throw new Error("Invalid table");
-  const [row] = await query(
-    `SELECT * FROM ${table} WHERE id=$1 AND user_id=$2`,
-    [recordId, user],
-  );
+  const sql = `SELECT * FROM ${table} WHERE id=$1 AND user_id=$2`;
+  const params = [recordId, user];
+  const [row] = client
+    ? (await client.query(sql, params)).rows
+    : await query(sql, params);
   if (!row) throw new AppError("Record not found", 404);
   return row;
 }

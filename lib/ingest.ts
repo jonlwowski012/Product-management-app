@@ -1,9 +1,18 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import AdmZip from "adm-zip";
-import { query, owned, AppError, id, audit, assertWritableUser } from "./db";
+import {
+  query,
+  owned,
+  AppError,
+  id,
+  audit,
+  assertWritableUser,
+  transaction,
+} from "./db";
+import { lockSourceWrite, type SourceWrite } from "./source-write";
 import { parseTranscript } from "./domain";
-import { storeOriginal, scheduleDeletion } from "./storage";
+import { prepareOriginal, scheduleDeletion } from "./storage";
 export const MAX_UPLOAD = 10 * 1024 * 1024;
 function decodeUtf8(data: Buffer) {
   try {
@@ -69,6 +78,7 @@ export async function ingestFiles(
   customer: string,
   title: string,
   files: { name: string; text: string }[],
+  origin?: SourceWrite,
 ) {
   await assertWritableUser(user);
   await owned("customers", customer, user);
@@ -91,25 +101,37 @@ export async function ingestFiles(
       continue;
     }
     const tid = id();
-    const storage = await storeOriginal(user, tid, file.text);
+    const store = await prepareOriginal(user, tid, file.text);
+    let storage: string | undefined;
     try {
-      await query(
-        "INSERT INTO transcripts(id,user_id,customer_id,title,filename,sha256,raw_text,segments,storage_path) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-        [
-          tid,
-          user,
-          customer,
-          (title || file.name).slice(0, 200),
-          file.name,
-          hash,
-          file.text,
-          JSON.stringify(parseTranscript(file.text)),
-          storage,
-        ],
-      );
+      const insert = async (write: typeof query) => {
+        storage = await store();
+        await write(
+          "INSERT INTO transcripts(id,user_id,customer_id,title,filename,sha256,raw_text,segments,storage_path) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+          [
+            tid,
+            user,
+            customer,
+            (title || file.name).slice(0, 200),
+            file.name,
+            hash,
+            file.text,
+            JSON.stringify(parseTranscript(file.text)),
+            storage,
+          ],
+        );
+      };
+      if (origin)
+        await transaction(async (c) => {
+          await lockSourceWrite(c, user, origin);
+          await insert(
+            async (sql, params) => (await c.query(sql, params)).rows,
+          );
+        });
+      else await insert(query);
       results.push({ id: tid, title: title || file.name, duplicate: false });
     } catch (e) {
-      await scheduleDeletion(storage);
+      if (storage) await scheduleDeletion(storage);
       if ((e as { code: string }).code === "23505") {
         const [row] = await query(
           "SELECT id,title FROM transcripts WHERE user_id=$1 AND sha256=$2",

@@ -102,6 +102,11 @@ test("all failed documents preserve warnings and can be retried", async ({
   expect(failed.result).toBeNull();
   expect(failed.analysis_warnings).toHaveLength(1);
   await expect(page.getByLabel("Analysis warnings")).toBeVisible();
+  await connect(page, "openai", "gpt-4.1-mini");
+  await page.reload();
+  await expect(
+    page.getByText(/Retry sends transcript text to Groq/),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Retry analysis", exact: true })
     .click();

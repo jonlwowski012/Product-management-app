@@ -3,10 +3,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import pg from "pg";
 import { randomUUID, createHash } from "node:crypto";
-import { mkdir, readFile, writeFile, access } from "node:fs/promises";
+import {
+  mkdir,
+  readFile,
+  writeFile,
+  access,
+  rename,
+  rmdir,
+} from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { lockSourceWrite } from "../lib/source-write";
 import { mockBlob } from "../scripts/mock-blob.mjs";
 test("backup restores a consistent database and verified original files into an empty database", async () => {
   const token = randomUUID().replaceAll("-", "");
@@ -73,7 +81,7 @@ test("backup restores a consistent database and verified original files into an 
     const {
       rows: [ledger],
     } = await source.query("SELECT count(*)::int AS n FROM schema_migrations");
-    assert.equal(ledger.n, 19);
+    assert.equal(ledger.n, 20);
     await source.query(
       "INSERT INTO deployment_environment(singleton,name) VALUES(true,'preview')",
     );
@@ -343,25 +351,62 @@ test("backup restores a consistent database and verified original files into an 
       "INSERT INTO audit(id,user_id,action,entity_type,entity_id) VALUES($1,$2,'source.deleted','source',$3)",
       [randomUUID(), user, sourceId],
     );
-    const replay = spawnSync(
-      process.execPath,
-      [
-        "--import",
-        "tsx",
-        "scripts/reapply-source-deletions.ts",
-        "--isolated-restore",
-      ],
-      {
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          DATABASE_URL: restoreUrl.toString(),
-          DELETION_LEDGER_DATABASE_URL: sourceUrl.toString(),
+    const replay = () =>
+      spawnSync(
+        process.execPath,
+        [
+          "--import",
+          "tsx",
+          "scripts/reapply-source-deletions.ts",
+          "--isolated-restore",
+        ],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            DATABASE_URL: restoreUrl.toString(),
+            DELETION_LEDGER_DATABASE_URL: sourceUrl.toString(),
+          },
         },
-      },
+      );
+    const {
+      rows: [direct],
+    } = await restored.query("SELECT clock_timestamp()::text AS started_at");
+    const originalPath = restoredSource.storage_path;
+    await rename(originalPath, originalPath + ".held");
+    await mkdir(originalPath);
+    const failedReplay = replay();
+    assert.equal(failedReplay.status, 1, failedReplay.stderr);
+    assert.match(failedReplay.stderr, /Keep the restored database offline/);
+    assert.equal(
+      (
+        await restored.query("SELECT 1 FROM discovery_sources WHERE id=$1", [
+          sourceId,
+        ])
+      ).rowCount,
+      0,
     );
-    assert.equal(replay.status, 0, replay.stderr);
-    assert.match(replay.stdout, /Reapplied 1 transcript deletions/);
+    await restored.query("BEGIN");
+    try {
+      await assert.rejects(
+        lockSourceWrite(restored, user, {
+          startedAt: direct.started_at,
+        }),
+        { status: 409 },
+      );
+    } finally {
+      await restored.query("ROLLBACK");
+    }
+    const pending = await restored.query(
+      "SELECT pathname FROM storage_deletions WHERE pathname=$1 AND attempts=1 AND not_before>now()",
+      [originalPath],
+    );
+    assert.equal(pending.rowCount, 1);
+    await rmdir(originalPath);
+    await rename(originalPath + ".held", originalPath);
+    const resumed = replay();
+    assert.equal(resumed.status, 0, resumed.stderr);
+    assert.match(resumed.stdout, /Reapplied 0 transcript deletions/);
     assert.equal(
       (
         await restored.query("SELECT 1 FROM discovery_sources WHERE id=$1", [

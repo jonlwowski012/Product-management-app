@@ -1203,6 +1203,14 @@ export function WorkflowApp({
                     )}
                   </>
                 )}
+                {report.job?.state === "failed" &&
+                  report.job.can_retry &&
+                  !demo && (
+                    <p>
+                      Retry sends transcript text to{" "}
+                      {providerName(report.job.provider)}.
+                    </p>
+                  )}
                 <div className="button-row">
                   {report.job?.state === "failed" && (
                     <button
@@ -1341,7 +1349,7 @@ export function WorkflowApp({
                       <small>
                         {demo
                           ? "Coverage describes the original saved run. This demo includes selected anonymized excerpts; live retries are disabled."
-                          : "Recovery reuses successful work and keeps this report. Your provider may charge for retried material."}
+                          : `Recovery reuses successful work and keeps this report. Retried material is sent to ${providerName(report!.job?.provider)}.`}
                       </small>
                       {report!.recovery_attempts >= 3 && (
                         <p>
@@ -1745,7 +1753,7 @@ export function WorkflowApp({
           source={source}
           change={setSource}
           close={() => setSource(null)}
-          canDelete={!demo && source.kind !== "transcript"}
+          canDelete={!demo}
         />
       )}
     </div>
@@ -1870,6 +1878,7 @@ function SourceViewer({
     reports: number;
     signals: number;
     reportIds: string[];
+    briefIds: string[];
     examples: { title: string; created_at: string }[];
   } | null>(null);
   const [deletion, setDeletion] = useState<{
@@ -1977,8 +1986,18 @@ function SourceViewer({
                     {impact.reports === 1 ? "report" : "reports"}, including
                     their validation notes, and {impact.signals} related{" "}
                     {impact.signals === 1 ? "signal" : "signals"}. If other
-                    transcripts appear in those reports, they stay saved.
+                    transcripts appear in those reports, their source files stay
+                    saved.
                   </p>
+                  {impact.briefIds.length > 0 && (
+                    <p>
+                      This also removes {impact.briefIds.length} affected{" "}
+                      {impact.briefIds.length === 1
+                        ? "decision brief"
+                        : "decision briefs"}
+                      .
+                    </p>
+                  )}
                   {impact.examples.length > 0 && (
                     <ul>
                       {impact.examples.map((report, index) => (
@@ -2012,7 +2031,11 @@ function SourceViewer({
                           setDeletion(
                             await request(
                               "sources/" + source.id,
-                              { reportIds: impact.reportIds },
+                              {
+                                reportIds: impact.reportIds,
+                                briefIds: impact.briefIds,
+                                signals: impact.signals,
+                              },
                               "DELETE",
                             ),
                           );
