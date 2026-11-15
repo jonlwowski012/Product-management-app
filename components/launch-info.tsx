@@ -155,12 +155,11 @@ export function LaunchInfo({
           </p>
           <p>
             You can delete a saved transcript from its source view. The
-            confirmation shows affected reports and decision briefs and shows
-            how many signals will be removed. Other saved transcripts remain
-            available for analysis. Private file cleanup runs separately and can
-            wait for the original upload link to expire. For older accepted
-            briefs, Evidence can identify affected drafts from their saved
-            evidence links.
+            confirmation shows affected reports, decision briefs, and the number
+            of signals that will be removed. Other saved transcripts remain
+            available for analysis. Private file cleanup can wait for the
+            original upload link to expire. Older accepted briefs may retain
+            draft text if their evidence links were removed before this update.
           </p>
           <p>
             You can export your data and delete your account in Settings.

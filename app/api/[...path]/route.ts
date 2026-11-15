@@ -103,7 +103,7 @@ async function validIds(
   table: string,
   ids: string[],
   user: string,
-  client?: pg.PoolClient,
+  client: pg.PoolClient,
 ) {
   for (const value of ids) await owned(table, value, user, client);
 }
