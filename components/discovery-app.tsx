@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AGREEMENT_VERSION } from "@/lib/user-agreement";
 import {
   Layers3,
@@ -17,16 +17,35 @@ import { request } from "./ui";
 import { DemoEntry } from "./demo";
 import { WorkflowApp } from "./workflow";
 
-export default function DiscoveryApp() {
+export default function DiscoveryApp({ beta }: { beta: boolean }) {
   return (
-    <WorkflowApp renderAuth={(onSuccess) => <Auth onSuccess={onSuccess} />} />
+    <WorkflowApp
+      renderAuth={(onSuccess) => <Auth onSuccess={onSuccess} beta={beta} />}
+    />
   );
 }
 
-function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
+function Auth({
+  onSuccess,
+  beta,
+}: {
+  onSuccess: () => Promise<void>;
+  beta: boolean;
+}) {
   const [mode, setMode] = useState<"login" | "register">("register"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [invitation, setInvitation] = useState("");
+  useEffect(() => {
+    if (!beta) return;
+    const token = new URLSearchParams(window.location.hash.slice(1)).get(
+      "invite",
+    );
+    if (token) {
+      setInvitation(token);
+      document.getElementById("get-started")?.scrollIntoView();
+    }
+  }, [beta]);
   return (
     <div className="marketing-home">
       <header className="home-nav">
@@ -35,7 +54,7 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
         </a>
         <nav aria-label="Main navigation">
           <a href="#how-it-works">How it works</a>
-          <a href="#pricing">Pricing</a>
+          <a href="#pricing">{beta ? "Beta access" : "Pricing"}</a>
           <a
             href="#get-started"
             onClick={() => {
@@ -76,7 +95,9 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
               <ArrowRight size={16} aria-hidden="true" />
             </a>
             <p className="home-price-note">
-              $10/month · All features · Bring your own AI API key
+              {beta
+                ? "Free private beta · Invitation required"
+                : "$10/month · All features · Bring your own AI API key"}
               <br />
               AI usage billed separately by your provider.
             </p>
@@ -271,16 +292,28 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
           aria-labelledby="pricing-title"
         >
           <div className="home-plan">
-            <span className="eyebrow">WHAT YOUR $10 GETS YOU</span>
+            <span className="eyebrow">
+              {beta ? "PRIVATE BETA" : "WHAT YOUR $10 GETS YOU"}
+            </span>
             <h2 id="pricing-title">
               Keep your customer
               <br />
               research together.
             </h2>
             <p className="home-plan-price">
-              $10 <span>USD / month</span>
+              {beta ? (
+                "Free for invited testers"
+              ) : (
+                <>
+                  $10 <span>USD / month</span>
+                </>
+              )}
             </p>
-            <p>One private workspace. One owner. Cancel anytime.</p>
+            <p>
+              {beta
+                ? "One private workspace. No card required."
+                : "One private workspace. One owner. Cancel anytime."}
+            </p>
             <ul>
               <li>
                 <Check size={17} aria-hidden="true" /> Reports with quotes you
@@ -303,12 +336,16 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
               <strong>Bring your own AI API key.</strong>
               <p>
                 Connect OpenAI, Anthropic, Groq, or Gemini. Your provider bills
-                AI usage separately from the $10 subscription.
+                AI usage separately.
               </p>
-              <p>No free trial. Explore the demo before subscribing.</p>
+              {!beta && (
+                <p>No free trial. Explore the demo before subscribing.</p>
+              )}
             </div>
             <a className="text-link" href="/pricing">
-              See plan limits and billing details{" "}
+              {beta
+                ? "See beta details"
+                : "See plan limits and billing details"}{" "}
               <ArrowUpRight size={15} aria-hidden="true" />
             </a>
           </div>
@@ -326,7 +363,9 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
               </h2>
               <p>
                 {mode === "register"
-                  ? "Create an account, connect your AI API key, and subscribe when you’re ready to work with your own transcripts."
+                  ? beta
+                    ? "Open your invitation link to create a free beta workspace."
+                    : "Create an account, connect your AI API key, and subscribe when you’re ready to work with your own transcripts."
                   : "Sign in to your evidence workspace."}
               </p>
               <form
@@ -342,6 +381,7 @@ function Auth({ onSuccess }: { onSuccess: () => Promise<void> }) {
                         ? {
                             agreement_accepted: form.has("agreement"),
                             agreement_version: AGREEMENT_VERSION,
+                            ...(beta ? { invitation } : {}),
                           }
                         : {}),
                       email: form.get("email"),

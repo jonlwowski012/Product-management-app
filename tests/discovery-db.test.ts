@@ -1,3 +1,4 @@
+import { dropTestDatabase } from "./fixtures/drop-test-database";
 import { paidAccount } from "./fixtures/paid-account";
 import "dotenv/config";
 import { test } from "node:test";
@@ -299,7 +300,6 @@ test("partial report recovery preserves the readable snapshot and successful che
     ).discoveryPool?.end();
     process.env = previousEnv;
     await db.end();
-    await admin.query(`DROP DATABASE "${name}" WITH (FORCE)`);
-    await admin.end();
+    await dropTestDatabase(admin, name);
   }
 });
