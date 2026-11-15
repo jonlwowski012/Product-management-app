@@ -279,7 +279,8 @@ async function handle(req: NextRequest, parts: string[]) {
     !demo &&
     req.method !== "GET" &&
     parts[0] !== "settings" &&
-    parts[0] !== "account"
+    parts[0] !== "account" &&
+    !(req.method === "DELETE" && parts[0] === "sources" && parts.length === 2)
   )
     await assertWritableUser(user);
   if (

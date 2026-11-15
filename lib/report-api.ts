@@ -1,8 +1,13 @@
+import {
+  deleteDiscoverySource,
+  sourceDeletionImpact,
+  sourceDeletionStatus,
+} from "./source-deletion";
 import { hostedJobs } from "./job-runner";
 import { z } from "zod";
 import { readFile } from "node:fs/promises";
-import { originalStream } from "./storage";
-import type { NextRequest } from "next/server";
+import { cleanStorage, originalStream } from "./storage";
+import { after, type NextRequest } from "next/server";
 import { AppError, query, transaction, assertWritableUser } from "./db";
 import {
   simpleMetadata,
@@ -23,7 +28,11 @@ export async function reportApi(
   body: () => Promise<any>,
   bytes: () => Promise<Buffer>,
 ) {
-  if (req.method !== "GET") await assertWritableUser(user);
+  if (
+    req.method !== "GET" &&
+    !(req.method === "DELETE" && parts[0] === "sources" && parts.length === 2)
+  )
+    await assertWritableUser(user);
   const route = parts.join("/");
   if (route === "flow" && req.method === "GET") return simpleMetadata(user);
   if (route === "sources" && req.method === "GET") {
@@ -87,6 +96,30 @@ export async function reportApi(
       );
     }
     return { sources, warnings };
+  }
+  if (parts[0] === "sources" && parts[1]) {
+    const sid = z.uuid().parse(parts[1]);
+    if (
+      req.method === "GET" &&
+      parts.length === 3 &&
+      parts[2] === "deletion-impact"
+    )
+      return sourceDeletionImpact(user, sid);
+    if (
+      req.method === "GET" &&
+      parts.length === 3 &&
+      parts[2] === "deletion-status"
+    )
+      return sourceDeletionStatus(user, sid);
+    if (req.method === "DELETE" && parts.length === 2) {
+      const input = z
+        .object({ reportIds: z.array(z.uuid()).max(10000) })
+        .parse(await body());
+      const deleted = await deleteDiscoverySource(user, sid, input.reportIds);
+      if (deleted.pending)
+        after(() => cleanStorage(deleted.receipt).catch(() => {}));
+      return deleted;
+    }
   }
   if (parts[0] === "sources" && parts[1] && req.method === "GET") {
     const sid = z.uuid().parse(parts[1]);

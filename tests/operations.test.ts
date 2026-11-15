@@ -73,7 +73,10 @@ test("backup restores a consistent database and verified original files into an 
     const {
       rows: [ledger],
     } = await source.query("SELECT count(*)::int AS n FROM schema_migrations");
-    assert.equal(ledger.n, 18);
+    assert.equal(ledger.n, 19);
+    await source.query(
+      "INSERT INTO deployment_environment(singleton,name) VALUES(true,'preview')",
+    );
     const user = randomUUID(),
       customer = randomUUID(),
       tid = randomUUID();
@@ -132,6 +135,10 @@ test("backup restores a consistent database and verified original files into an 
         documentPath,
       ],
     );
+    await source.query(
+      "INSERT INTO discovery_report_sources(user_id,report_id,source_id,role) VALUES($1,$2,$3,'customer')",
+      [user, reportId, sourceId],
+    );
     const wrapperDir = path.join(dir, "bin"),
       marker = path.join(dir, "dump-complete"),
       release = path.join(dir, "release-dump");
@@ -183,9 +190,14 @@ test("backup restores a consistent database and verified original files into an 
     } = await deleting.query("SELECT pg_backend_pid() AS id");
     let deleted = false,
       blocked = false;
+    await deleting.query("BEGIN");
+    await deleting.query("DELETE FROM discovery_reports WHERE user_id=$1", [
+      user,
+    ]);
     const deletion = deleting
       .query("DELETE FROM users WHERE id=$1", [user])
-      .then(() => {
+      .then(async () => {
+        await deleting.query("COMMIT");
         deleted = true;
       });
     for (let i = 0; i < 100 && !deleted; i++) {
@@ -322,6 +334,54 @@ test("backup restores a consistent database and verified original files into an 
     } = await cloud.query("SELECT state,workflow_run_id FROM jobs");
     assert.equal(restoredJob.state, "failed");
     assert.equal(restoredJob.workflow_run_id, null);
+    // Use a fresh ledger receipt to represent a transcript removed after the snapshot.
+    await source.query(
+      "INSERT INTO users(id,email,name,password_hash) VALUES($1,'ops@example.com','Operations','fixture')",
+      [user],
+    );
+    await source.query(
+      "INSERT INTO audit(id,user_id,action,entity_type,entity_id) VALUES($1,$2,'source.deleted','source',$3)",
+      [randomUUID(), user, sourceId],
+    );
+    const replay = spawnSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "scripts/reapply-source-deletions.ts",
+        "--isolated-restore",
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          DATABASE_URL: restoreUrl.toString(),
+          DELETION_LEDGER_DATABASE_URL: sourceUrl.toString(),
+        },
+      },
+    );
+    assert.equal(replay.status, 0, replay.stderr);
+    assert.match(replay.stdout, /Reapplied 1 transcript deletions/);
+    assert.equal(
+      (
+        await restored.query("SELECT 1 FROM discovery_sources WHERE id=$1", [
+          sourceId,
+        ])
+      ).rowCount,
+      0,
+    );
+    assert.equal(
+      (
+        await restored.query("SELECT 1 FROM discovery_reports WHERE id=$1", [
+          reportId,
+        ])
+      ).rowCount,
+      0,
+    );
+    await assert.rejects(access(restoredSource.storage_path), {
+      code: "ENOENT",
+    });
+    assert.equal(await readFile(rows[0].storage_path, "utf8"), raw);
   } finally {
     blob.close();
     await cloud.end();

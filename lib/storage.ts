@@ -110,9 +110,10 @@ export async function scheduleDeletion(storage: string, delayMs = 0) {
     [storage, delayMs],
   );
 }
-export async function cleanStorage() {
+export async function cleanStorage(receipt?: string) {
   const rows = await query(
-    "SELECT pathname,transcript_id,xmin::text AS version FROM storage_deletions WHERE not_before<=now() ORDER BY attempts,not_before,created_at LIMIT 50",
+    "SELECT pathname,transcript_id,xmin::text AS version FROM storage_deletions WHERE not_before<=now() AND ($1::uuid IS NULL OR source_deletion_id=$1) ORDER BY attempts,not_before,created_at LIMIT 50",
+    [receipt ?? null],
   );
   for (const row of rows) {
     try {

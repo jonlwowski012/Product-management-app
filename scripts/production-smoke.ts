@@ -84,6 +84,11 @@ await database.query(
     (await readFile(
       new URL("../lib/private-beta.sql", import.meta.url),
       "utf8",
+    )) +
+    "\n" +
+    (await readFile(
+      new URL("../lib/source-deletion.sql", import.meta.url),
+      "utf8",
     )),
 );
 await database.end();

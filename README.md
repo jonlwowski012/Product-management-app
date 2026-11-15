@@ -233,3 +233,25 @@ Vercel plan covers an invited beta for a future paid product before enabling it.
   issuance to ten slots per environment. A beta participant uses their own AI
   provider key. Beta access ends when beta mode is disabled. Participants keep
   their accounts and can choose whether to subscribe.
+
+### Transcript security and recovery
+
+Evidence sends the selected source text to the user's chosen AI provider when
+they start analysis. Provider retention and training policies apply separately.
+Use synthetic transcripts on staging. Before inviting testers to upload real
+interviews, confirm MFA for operators on GitHub, Vercel, and Neon, and confirm
+Vercel's project or team training opt-out in Data Preferences. Keep transcript
+text, authorization headers, and provider keys out of logs and support tools.
+The Privacy and data handling page links to the security contact.
+
+For a restore, keep the recovered environment offline. Restore into an isolated
+database and private file store, apply migrations, and reapply account deletion
+requests. Then set `DATABASE_URL` to the restored database and
+`DELETION_LEDGER_DATABASE_URL` to the authoritative current database for the
+same environment. Use the restored store credentials and run
+`npx tsx scripts/reapply-source-deletions.ts --isolated-restore`.
+Transcript deletion receipts contain IDs and dates, with no source content.
+The script removes any sources reintroduced by an older backup and their
+affected reports. Confirm replay succeeded and file cleanup is complete before
+serving traffic. If a current deletion ledger is unavailable, keep the restored
+data offline until deletion requests can be reconciled.

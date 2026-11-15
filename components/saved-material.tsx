@@ -9,11 +9,13 @@ export function SavedMaterial({
   selected,
   disabled,
   onToggle,
+  onOpen,
 }: {
   total: number;
   selected: { id: string; role: string }[];
   disabled: boolean;
   onToggle: (source: SavedSource) => void;
+  onOpen: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -80,18 +82,28 @@ export function SavedMaterial({
           {page.sources.map((source) => {
             const checked = selected.some((item) => item.id === source.id);
             return (
-              <label className="flow-file" key={source.id}>
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  disabled={
-                    disabled ||
-                    (!checked && selected.length >= MAX_DISCOVERY_FILES)
-                  }
-                  onChange={() => onToggle(source)}
-                />
-                <span>{source.filename}</span>
-              </label>
+              <div className="flow-file" key={source.id}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={
+                      disabled ||
+                      (!checked && selected.length >= MAX_DISCOVERY_FILES)
+                    }
+                    onChange={() => onToggle(source)}
+                  />
+                  <span>{source.filename}</span>
+                </label>
+                <button
+                  type="button"
+                  className="button ghost"
+                  aria-label={"View " + source.filename}
+                  onClick={() => onOpen(source.id)}
+                >
+                  View
+                </button>
+              </div>
             );
           })}
           {selected.length >= MAX_DISCOVERY_FILES && (
