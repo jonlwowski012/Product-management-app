@@ -783,6 +783,7 @@ export function WorkflowApp({
                         total={meta.sources_total}
                         selected={selected}
                         disabled={busy || demo}
+                        onOpen={(id) => setSource({ id, page: 0 })}
                         onToggle={(item) => {
                           setMeta(
                             (m: Row | null) =>
@@ -811,6 +812,14 @@ export function WorkflowApp({
                           Your other documents remain saved.
                         </p>
                       )}
+                    <p>
+                      Upload or paste only material you have permission to
+                      share. Remove names, contact details, and other personal
+                      information you don’t need for analysis.{" "}
+                      <AppLink href="/privacy" className="text-link">
+                        How we handle transcripts
+                      </AppLink>
+                    </p>
                     <div
                       className="flow-drop"
                       onDragOver={(e) => e.preventDefault()}
@@ -1078,9 +1087,9 @@ export function WorkflowApp({
                       )}
                     </div>
                     <p className="flow-reassurance">
-                      Analysis sends source text to{" "}
-                      {providerName(meta.analysisProvider)}. Company context
-                      stays separate from customer evidence.
+                      When you analyze, Evidence sends relevant source text to{" "}
+                      {providerName(meta.analysisProvider)} using your API key.
+                      Your provider’s retention and training settings apply.
                     </p>
                     {!meta.hasOwnKey && !demo && (
                       <p className="flow-allowance">
@@ -1194,6 +1203,14 @@ export function WorkflowApp({
                     )}
                   </>
                 )}
+                {report.job?.state === "failed" &&
+                  report.job.can_retry &&
+                  !demo && (
+                    <p>
+                      Retry sends transcript text to{" "}
+                      {providerName(report.job.provider)}.
+                    </p>
+                  )}
                 <div className="button-row">
                   {report.job?.state === "failed" && (
                     <button
@@ -1332,7 +1349,7 @@ export function WorkflowApp({
                       <small>
                         {demo
                           ? "Coverage describes the original saved run. This demo includes selected anonymized excerpts; live retries are disabled."
-                          : "Recovery reuses successful work and keeps this report. Your provider may charge for retried material."}
+                          : `Recovery reuses successful work and keeps this report. Retried material is sent to ${providerName(report!.job?.provider)}.`}
                       </small>
                       {report!.recovery_attempts >= 3 && (
                         <p>
@@ -1736,6 +1753,7 @@ export function WorkflowApp({
           source={source}
           change={setSource}
           close={() => setSource(null)}
+          canDelete={!demo}
         />
       )}
     </div>
@@ -1809,10 +1827,12 @@ function SourceViewer({
   source,
   change,
   close,
+  canDelete,
 }: {
   source: SourceSelection;
   change: (s: any) => void;
   close: () => void;
+  canDelete: boolean;
 }) {
   const [data, setData] = useState<Row | null>(null),
     [error, setError] = useState("");
@@ -1854,6 +1874,31 @@ function SourceViewer({
       active = false;
     };
   }, [source.id, source.page, source.kind, source.quote, source.start]);
+  const [impact, setImpact] = useState<{
+    reports: number;
+    signals: number;
+    reportIds: string[];
+    briefIds: string[];
+    examples: { title: string; created_at: string }[];
+  } | null>(null);
+  const [deletion, setDeletion] = useState<{
+    receipt: string;
+    pending: boolean;
+  } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  useEffect(() => {
+    if (!deletion?.pending) return;
+    const timer = setInterval(() => {
+      void request("sources/" + deletion.receipt + "/deletion-status")
+        .then(({ pending }) =>
+          setDeletion({ receipt: deletion.receipt, pending }),
+        )
+        .catch(() => {});
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [deletion?.receipt, deletion?.pending]);
+
   let at = source.quote && data ? data.page.text.indexOf(source.quote) : -1;
   const quoteStart =
     source.start === undefined ? undefined : source.start - (data?.offset ?? 0);
@@ -1865,8 +1910,33 @@ function SourceViewer({
   )
     at = quoteStart;
   return (
-    <Modal title="Source passage" onClose={close}>
-      {error ? (
+    <Modal
+      title={deletion ? "Transcript deleted" : "Source passage"}
+      onClose={() => {
+        if (busy) return;
+        if (deletion) window.location.assign("/?new=1");
+        else close();
+      }}
+    >
+      {deletion ? (
+        <>
+          <p role="status">
+            {deletion.pending
+              ? "Removed from your workspace. Private file cleanup is queued."
+              : "Removed from your workspace. Private file cleanup is complete."}
+          </p>
+          <AppLink
+            className="button primary"
+            href="/?new=1"
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.assign("/?new=1");
+            }}
+          >
+            Back to Discovery
+          </AppLink>
+        </>
+      ) : error ? (
         <p role="alert">{error}</p>
       ) : !data ? (
         <p>Loading source…</p>
@@ -1884,6 +1954,114 @@ function SourceViewer({
           >
             <Download size={15} /> Download original
           </DownloadLink>
+          {canDelete && (
+            <>
+              {!impact ? (
+                <button
+                  className="button ghost"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setDeleteError("");
+                    try {
+                      setImpact(
+                        await request(
+                          "sources/" + source.id + "/deletion-impact",
+                        ),
+                      );
+                    } catch (e) {
+                      setDeleteError((e as Error).message);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Delete transcript
+                </button>
+              ) : (
+                <div className="flow-allowance">
+                  <p>
+                    This permanently removes this transcript and its quotes from
+                    Evidence. It also removes {impact.reports} affected{" "}
+                    {impact.reports === 1 ? "report" : "reports"}, including
+                    their validation notes, and {impact.signals} related{" "}
+                    {impact.signals === 1 ? "signal" : "signals"}. If other
+                    transcripts appear in those reports, their source files stay
+                    saved.
+                  </p>
+                  {impact.briefIds.length > 0 && (
+                    <p>
+                      This also removes {impact.briefIds.length} affected{" "}
+                      {impact.briefIds.length === 1
+                        ? "decision brief"
+                        : "decision briefs"}
+                      .
+                    </p>
+                  )}
+                  {impact.examples.length > 0 && (
+                    <ul>
+                      {impact.examples.map((report, index) => (
+                        <li key={impact.reportIds[index]}>
+                          {report.title} ·{" "}
+                          {new Date(report.created_at).toLocaleDateString()}
+                        </li>
+                      ))}
+                      {impact.reports > impact.examples.length && (
+                        <li>
+                          And {impact.reports - impact.examples.length} more
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                  <p>
+                    Copies sent to your AI provider follow that provider’s
+                    retention settings.{" "}
+                    <AppLink href="/privacy" className="text-link">
+                      Deletion details
+                    </AppLink>
+                  </p>
+                  <div className="button-row">
+                    <button
+                      className="button primary"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        setDeleteError("");
+                        try {
+                          setDeletion(
+                            await request(
+                              "sources/" + source.id,
+                              {
+                                reportIds: impact.reportIds,
+                                briefIds: impact.briefIds,
+                                signals: impact.signals,
+                              },
+                              "DELETE",
+                            ),
+                          );
+                        } catch (e) {
+                          setImpact(null);
+                          setDeleteError((e as Error).message);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Permanently delete transcript
+                    </button>
+                    <button
+                      className="button secondary"
+                      disabled={busy}
+                      onClick={() => setImpact(null)}
+                    >
+                      Cancel deletion
+                    </button>
+                  </div>
+                </div>
+              )}
+              {deleteError && <p role="alert">{deleteError}</p>}
+            </>
+          )}
           <div className="flow-source-paging">
             <button
               className="button secondary"

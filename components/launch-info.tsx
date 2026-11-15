@@ -154,6 +154,14 @@ export function LaunchInfo({
             Authentication uses essential session cookies.
           </p>
           <p>
+            You can delete a saved transcript from its source view. The
+            confirmation shows affected reports, decision briefs, and the number
+            of signals that will be removed. Other saved transcripts remain
+            available for analysis. Private file cleanup can wait for the
+            original upload link to expire. Older accepted briefs may retain
+            draft text if their evidence links were removed before this update.
+          </p>
+          <p>
             You can export your data and delete your account in Settings.
             Deletion disables access, removes saved keys, cancels subscriptions,
             and queues private files for deletion with retries. Financial
@@ -162,12 +170,18 @@ export function LaunchInfo({
             provider’s terms.
           </p>
           <p>
+            To report a security or privacy concern, contact{" "}
+            <a href={`mailto:${support}`}>{support}</a>. Include the affected
+            page and approximate time, and leave transcript text and credentials
+            out of the message.
+          </p>
+          <p>
             After paid access ends, your workspace is read-only for 30 days,
             then scheduled for deletion. Existing accounts without a paid
             subscription are retained during the launch transition. Production
             backups must be stored encrypted and retained for at most 30 days;
-            restored environments must reapply account deletion requests before
-            serving traffic.
+            restored environments must reapply account and transcript deletion
+            requests before serving traffic.
           </p>
         </>
       )}

@@ -2,7 +2,7 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { requireUser } from "@/lib/auth";
 import { apiResult, smallJson, sameOrigin } from "@/lib/http";
 import { reservation, completeUpload } from "@/lib/uploads";
-import { AppError, assertWritableUser } from "@/lib/db";
+import { AppError, assertWritableUser, query } from "@/lib/db";
 import { scheduleDeletion } from "@/lib/storage";
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -23,14 +23,21 @@ export async function POST(req: Request) {
           throw new AppError("Use the private upload endpoint", 400);
         if (pathname !== r.pathname || r.state !== "pending")
           throw new AppError("Upload reservation does not match", 403);
+        const validUntil = Math.min(
+          Date.now() + 15 * 60 * 1000,
+          new Date(r.expires_at).getTime(),
+        );
+        const [issued] = await query(
+          "UPDATE upload_reservations SET token_expires_at=greatest(token_expires_at,$1) WHERE id=$2 AND user_id=$3 AND state='pending' AND expires_at>now() RETURNING id",
+          [new Date(validUntil), r.id, user.id],
+        );
+        if (!issued)
+          throw new AppError("Upload reservation does not match", 403);
         return {
           maximumSizeInBytes: r.expected_size,
           addRandomSuffix: false,
           allowOverwrite: false,
-          validUntil: Math.min(
-            Date.now() + 15 * 60 * 1000,
-            new Date(r.expires_at).getTime(),
-          ),
+          validUntil,
           allowedContentTypes: [
             "text/plain",
             "text/markdown",

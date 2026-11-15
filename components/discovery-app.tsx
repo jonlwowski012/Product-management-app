@@ -54,6 +54,7 @@ function Auth({
         </a>
         <nav aria-label="Main navigation">
           <a href="#how-it-works">How it works</a>
+          <a href="#transcript-security">Security</a>
           <a href="#pricing">{beta ? "Beta access" : "Pricing"}</a>
           <a
             href="#get-started"
@@ -281,6 +282,52 @@ function Auth({
                 Save what you plan to test and what you learn along the way.
                 Share a report so your team can see how you reached your
                 decision.
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section
+          className="home-value"
+          id="transcript-security"
+          aria-labelledby="security-title"
+        >
+          <div>
+            <h2 id="security-title">How we handle your transcripts</h2>
+            <a className="text-link" href="/privacy">
+              Privacy and data handling{" "}
+              <ArrowUpRight size={15} aria-hidden="true" />
+            </a>
+          </div>
+          <dl>
+            <div>
+              <dt>
+                <ShieldCheck size={19} aria-hidden="true" /> Private by default
+              </dt>
+              <dd>
+                Uploaded files are stored privately. Viewing or downloading a
+                transcript requires access to its workspace.
+              </dd>
+            </div>
+            <div>
+              <dt>
+                <Layers3 size={19} aria-hidden="true" /> You choose the AI
+                provider
+              </dt>
+              <dd>
+                When you run an analysis, Evidence sends relevant transcript
+                text to the provider you connected. Your provider’s retention
+                and training settings apply.
+              </dd>
+            </div>
+            <div>
+              <dt>
+                <FileText size={19} aria-hidden="true" /> You control what you
+                keep
+              </dt>
+              <dd>
+                Delete a saved transcript from its source view. Export your data
+                or delete your account in Settings.
               </dd>
             </div>
           </dl>

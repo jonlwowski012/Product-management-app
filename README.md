@@ -2,7 +2,7 @@
 
 A private, user-owned discovery app with one default workflow: **upload transcripts → find opportunities → get a next step**. Paste notes or upload transcripts, PDFs, DOCX documents, and PPTX slides. Evidence produces up to three problem-oriented opportunities, with supporting passages, direct challenges, separate risks and context, uncertainty, and a practical validation step. Choose an opportunity, track your validation, and record what you learned. CRM is outside this release.
 
-Apply migrations through **017** with `npm run db:migrate` before running this version. Existing reports, sources, reviewed fields, recovery snapshots, and human validation work are retained.
+Apply migrations through **020** with `npm run db:migrate` before running this version. Existing reports, sources, reviewed fields, recovery snapshots, and human validation work are retained.
 
 ## Simple discovery workflow
 
@@ -26,7 +26,7 @@ The workspace has three focused views: **Discovery**, **Customers**, and **Signa
 
 Automated checks use synthetic notes and a local provider double. They cover separate challenge/risk categories, source ownership, partial recovery with checkpoint reuse, concurrent recovery requests and attempt limits, retained edits and learning, allowance checks, exports, backup/restore, read-only demo boundaries, and mobile layouts. They do not establish real model quality or first-time-user comprehension.
 
-Before promoting this change, run one controlled analysis in a dedicated synthetic account using an approved live provider connection. Include an explicit customer disagreement, an operational constraint, and internal strategy; inspect the original quotes, category explanations, coverage, and saved learning. Record the provider/model and result without storing its key. Apply migrations through 016 before the application release, then verify Preview before Production.
+Before promoting this change, run one controlled analysis in a dedicated synthetic account using an approved live provider connection. Include an explicit customer disagreement, an operational constraint, and internal strategy; inspect the original quotes, category explanations, coverage, and saved learning. Record the provider/model and result without storing its key. Apply migrations through 020 before the application release, then verify Preview before Production.
 
 Run five individual first-use sessions without coaching. Use the fictional interviews and internal notes in `tests/fixtures/discovery-acceptance/`. Ask each person to explain what Evidence does, upload the supplied synthetic transcripts, find a problem and its next step, open its source evidence, explain a disagreement versus a risk, choose an opportunity, record an inconclusive result, and find that learning after adding material. Include a partial-analysis recovery task. Record completion, time to first useful result, misunderstandings, and assistance needed. Release only when all five recognize partial coverage and retain their learning, and at least four complete the core journey unaided. Fix and retest any misleading evidence interpretation or blocked task. These human checks remain pending until performed by real participants.
 
@@ -52,7 +52,7 @@ Evidence has one plan: **$10 USD/month**, one owner and private workspace, all c
 
 Netlify is the primary deployment target. `netlify.toml` sets Node 22, private Netlify storage, Async Workloads, and separate Production/Preview environment bindings. Build and publish with the Netlify CLI as described below; the obsolete Vercel deployment workflow has been removed.
 
-Apply migrations through **017** with `npm run db:migrate` before deploying. They preserve existing data, add subscription/account records and deletion/concurrency safeguards, and enforce 1 GB of originals, 25 million extracted text characters per workspace, and one active analysis per owner. Legacy original sizes are estimated from stored pages until exact sizes are available. There are no automatic overage charges. Existing accounts are never charged automatically.
+Apply migrations through **020** with `npm run db:migrate` before deploying. They preserve existing data, add subscription/account records and deletion/concurrency safeguards, and enforce 1 GB of originals, 25 million extracted text characters per workspace, and one active analysis per owner. Legacy original sizes are estimated from stored pages until exact sizes are available. There are no automatic overage charges. Existing accounts are never charged automatically.
 
 Stripe Checkout and the customer portal manage subscriptions. Configure `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` (an active USD 1,000-cent monthly recurring price), `STRIPE_PORTAL_CONFIGURATION_ID` (the Evidence-specific cancellation configuration), and `STRIPE_WEBHOOK_SECRET` independently for Preview/sandbox and Production/live mode. Register `/api/billing/webhook` for `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, and `invoice.payment_failed`. Signature validation is required; the webhook is outside browser-session/CSRF authentication. Retries are idempotent; subscription state is fetched under a database lock rather than trusting event delivery order. Only settled invoice periods grant access, including zero-dollar invoices after a 100% discount. Checkout accepts Stripe promotion codes; older open sessions are replaced so the code field is available. Refresh payment status in Settings reconciles a delayed webhook. Configure the Stripe portal to permit cancellation at the end of the paid period, payment method changes, and invoice downloads.
 
@@ -186,7 +186,7 @@ The old Vercel site stays paused during the seven-day rollback window. Keep the 
 
 Run `npm run backup -- /absolute/path/to/new-backup-directory` from a trusted operations host with PostgreSQL command-line tools and a direct database connection. It creates a consistent SQL snapshot; canonical source text is in PostgreSQL. Retain APP_SECRET separately in a secret manager.
 
-Restore with `npm run restore -- /absolute/path/to/backup-directory` while pointing DATABASE_URL at a **new, empty database**. Restore refuses an existing schema, checks every original SHA-256 digest, and reconstructs originals into private Netlify Blobs when `STORAGE_PROVIDER=netlify` and the offline storage credentials are configured (otherwise local files). Legacy Vercel restores remain supported during the rollback window. Use a new isolated private store for a hosted restore. Pending storage deletions/reservations are discarded, and formerly active jobs become failed/retryable rather than referring to old Workflow runs. A backup retains its environment binding; restore Production into a new Production database. Pause web writes during cutover, verify restoration, then change runtime/migration URLs together and redeploy.
+Restore with `npm run restore -- /absolute/path/to/backup-directory` while pointing DATABASE_URL at a **new, empty database**. Restore refuses an existing schema, checks every original SHA-256 digest, and reconstructs originals into private Netlify Blobs when `STORAGE_PROVIDER=netlify` and the offline storage credentials are configured (otherwise local files). Legacy Vercel restores remain supported during the rollback window. Use a new isolated private store for a hosted restore. Pending storage deletions/reservations are discarded, and formerly active jobs become failed/retryable rather than referring to old Workflow runs. A backup retains its environment binding; restore Production into a new Production database. Keep the restored environment offline and follow [Transcript security and recovery](#transcript-security-and-recovery) to replay deletions. Verify restoration before changing runtime/migration URLs and redeploying.
 
 The automated suite covers local backup/restore, local Workflow and Netlify Async Workloads checkpoint retries, private direct uploads above 4.5 MB, paged reads/source windows, ownership/CSRF/callback boundaries, and cleanup. `npm run test:hosted` verifies deployed HTTPS navigation, secure sessions and Blob configuration with a dedicated synthetic account. CI also enables a live 5+ MB private upload/download check; set `HOSTED_TEST_AI=true` in the GitHub environment to exercise its smoke account's saved provider key and actual hosted Netlify analysis (this incurs provider usage). The script deletes its synthetic transcripts afterward and retains only a screenshot, avoiding credential-bearing network traces. These hosted upload/AI checks require connected service credentials; local passing tests alone do not prove live Neon/Netlify Blobs/Async Workloads provisioning.
 
@@ -198,7 +198,7 @@ Use Node 22 for all commands. `npm run test:ops` includes commercial boundaries 
 
 `.github/workflows/operations.yml` schedules a daily encrypted backup and protected maintenance/health check. Create a GitHub **operations** environment with `DIRECT_DATABASE_URL`, `BACKUP_ENCRYPTION_KEY`, and `CRON_SECRET` secrets (plus the old `BLOB_READ_WRITE_TOKEN` only while legacy Vercel originals remain) and the `APP_URL` variable. Use a dedicated backup key from a secret manager, separate from `APP_SECRET`; keep both available for disaster recovery. Enable notifications for workflow failures. Backups are AES-256-GCM authenticated archives, retained as GitHub artifacts for 30 days; keep the repository private and restrict operations access. Do not use a backup environment that requires interactive approval for every scheduled run. Keep these values in environment secrets; never commit them. Scheduled provider quota waits retain their resume time and do not count as stuck work before that time.
 
-`npm run backup:encrypted -- /absolute/new-backup.evb` creates a new encrypted archive and removes temporary plaintext. `npm run restore:encrypted -- /absolute/backup.evb` authenticates the complete archive before extraction, then uses the existing empty-database and source-hash-verified restore. Use a new database and isolated private Blob store. Before cutover, replay account deletion requests received since the snapshot from your independently retained operations record; this is a required manual step. Verify restored reports, original bytes, saved learning, and keys, then change runtime/migration database URLs together. Keep the previous deployment available for application rollback; never reverse applied migrations or merge PRs automatically.
+`npm run backup:encrypted -- /absolute/new-backup.evb` creates a new encrypted archive and removes temporary plaintext. `npm run restore:encrypted -- /absolute/backup.evb` authenticates the complete archive before extraction, then uses the existing empty-database and source-hash-verified restore. Use a new database and isolated private Blob store. Before cutover, replay account and transcript deletions following [Transcript security and recovery](#transcript-security-and-recovery). Verify restored reports, original bytes, saved learning, and keys, then change runtime/migration database URLs together. Keep the previous deployment available for application rollback; never reverse applied migrations or merge PRs automatically.
 
 `npm run health` reads authenticated health counters and fails for stuck processing jobs, recent failed analyses, repeated storage cleanup failures, or past-due accounts. Workflow failures are the operator alert. Never include source content, passwords, keys, or raw provider error bodies in monitoring. Monitor Netlify credits and Neon usage before committing publicly to the capacity limits. Netlify remains on Free with automatic top-ups disabled; credit exhaustion pauses the app. No paid hosting upgrade has been made.
 
@@ -233,3 +233,28 @@ Vercel plan covers an invited beta for a future paid product before enabling it.
   issuance to ten slots per environment. A beta participant uses their own AI
   provider key. Beta access ends when beta mode is disabled. Participants keep
   their accounts and can choose whether to subscribe.
+
+### Transcript security and recovery
+
+Evidence sends the selected source text to the user's chosen AI provider when
+they start analysis. Provider retention and training policies apply separately.
+Use synthetic transcripts on staging. Before inviting testers to upload real
+interviews, confirm MFA for operators on GitHub, Vercel, and Neon, and confirm
+Vercel's project or team training opt-out in Data Preferences. Keep transcript
+text, authorization headers, and provider keys out of logs and support tools.
+The Privacy and data handling page links to the security contact.
+
+For a restore, keep the recovered environment offline. Use the restore commands
+above to populate an isolated database and private file store, then apply
+migrations. Before the final replay,
+pause writes and workers on the authoritative environment. Keep writes paused
+until traffic switches to the recovered environment. Reapply account deletion
+requests, then set `DATABASE_URL` to the restored database and
+`DELETION_LEDGER_DATABASE_URL` to the authoritative current database for the
+same environment. Use the restored store credentials and run
+`npx tsx scripts/reapply-source-deletions.ts --isolated-restore`.
+Transcript deletion receipts contain IDs and dates, with no source content.
+The script removes any sources reintroduced by an older backup and their
+affected reports. Confirm replay succeeded and file cleanup is complete before
+serving traffic. If a current deletion ledger is unavailable, keep the restored
+data offline until deletion requests can be reconciled.

@@ -12,7 +12,12 @@ export const privateKey = (pathname: string) =>
 export const uploadKey = (pathname: string) =>
   pathname.startsWith("netlify:") ? pathname : "blob:" + pathname;
 const netlifyStore = () =>
-  getStore({ name: "evidence-originals", consistency: "strong" });
+  getStore({
+    name: "evidence-originals",
+    consistency: "strong",
+    siteID: process.env.NETLIFY_BLOBS_SITE_ID,
+    token: process.env.NETLIFY_BLOBS_TOKEN,
+  });
 export async function putPrivate(
   pathname: string,
   data: string | Uint8Array,
@@ -61,22 +66,28 @@ export async function readUpload(pathname: string) {
     storage: "blob:" + info.url,
   };
 }
-export async function storeOriginal(user: string, tid: string, text: string) {
+export async function prepareOriginal(user: string, tid: string, text: string) {
   if (blobEnabled()) {
     const pathname = `originals/${user}/${tid}.txt`;
     await query(
       "INSERT INTO storage_deletions(pathname,transcript_id,not_before) VALUES($1,$2,now()+interval '1 day') ON CONFLICT DO NOTHING",
       [privateKey(pathname), tid],
     );
-    return putPrivate(pathname, text, "text/plain; charset=utf-8");
+    return () => putPrivate(pathname, text, "text/plain; charset=utf-8");
   }
   if (process.env.SITE_ID)
     throw new AppError("Private Blob storage is not configured", 503);
-  const folder = path.resolve(process.env.DATA_DIR ?? ".data", "uploads", user);
-  await mkdir(folder, { recursive: true, mode: 0o700 });
-  const file = path.join(folder, tid + ".txt");
-  await writeFile(file, text, { mode: 0o600 });
-  return file;
+  return async () => {
+    const folder = path.resolve(
+      process.env.DATA_DIR ?? ".data",
+      "uploads",
+      user,
+    );
+    await mkdir(folder, { recursive: true, mode: 0o700 });
+    const file = path.join(folder, tid + ".txt");
+    await writeFile(file, text, { mode: 0o600 });
+    return file;
+  };
 }
 export async function originalStream(storage: string, raw: string) {
   if (storage.startsWith("netlify:")) {
@@ -106,13 +117,14 @@ export async function deleteStored(storage: string) {
 }
 export async function scheduleDeletion(storage: string, delayMs = 0) {
   await query(
-    "INSERT INTO storage_deletions(pathname,not_before) VALUES($1,now()+($2::bigint * interval '1 millisecond')) ON CONFLICT(pathname) DO UPDATE SET not_before=greatest(storage_deletions.not_before,excluded.not_before)",
+    "INSERT INTO storage_deletions(pathname,not_before) VALUES($1,now()+($2::bigint * interval '1 millisecond')) ON CONFLICT(pathname) DO UPDATE SET not_before=greatest(storage_deletions.not_before,excluded.not_before) WHERE cardinality(storage_deletions.source_deletion_ids)=0",
     [storage, delayMs],
   );
 }
-export async function cleanStorage() {
+export async function cleanStorage(receipt?: string) {
   const rows = await query(
-    "SELECT pathname,transcript_id,xmin::text AS version FROM storage_deletions WHERE not_before<=now() ORDER BY attempts,not_before,created_at LIMIT 50",
+    "SELECT pathname,transcript_id,xmin::text AS version FROM storage_deletions WHERE not_before<=now() AND ($1::uuid IS NULL OR source_deletion_ids @> ARRAY[$1]::uuid[]) ORDER BY attempts,not_before,created_at LIMIT 50",
+    [receipt ?? null],
   );
   for (const row of rows) {
     try {
@@ -127,8 +139,8 @@ export async function cleanStorage() {
       );
     } catch {
       await query(
-        "UPDATE storage_deletions SET attempts=attempts+1,not_before=greatest(not_before,now()+interval '15 minutes') WHERE pathname=$1",
-        [row.pathname],
+        "UPDATE storage_deletions SET attempts=attempts+1,not_before=greatest(not_before,now()+interval '15 minutes') WHERE pathname=$1 AND xmin::text=$2",
+        [row.pathname, row.version],
       );
     }
   }

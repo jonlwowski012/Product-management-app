@@ -89,6 +89,16 @@ await db.query(
     (await readFile(
       new URL("../lib/private-beta.sql", import.meta.url),
       "utf8",
+    )) +
+    "\n" +
+    (await readFile(
+      new URL("../lib/source-deletion.sql", import.meta.url),
+      "utf8",
+    )) +
+    "\n" +
+    (await readFile(
+      new URL("../lib/source-deletion-receipts.sql", import.meta.url),
+      "utf8",
     )),
 );
 // Authentication limits belong to this isolated test run.

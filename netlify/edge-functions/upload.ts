@@ -44,10 +44,17 @@ export default async (request: Request) => {
     data.set(chunk, offset);
     offset += chunk.length;
   }
+  if (Date.now() >= ticket.expires)
+    return Response.json(
+      { error: "Upload authorization expired; select the file again" },
+      { status: 401 },
+    );
   try {
     const stored = await getStore({
       name: "evidence-originals",
       consistency: "strong",
+      fetch: (input, init) =>
+        fetch(input, { ...init, signal: AbortSignal.timeout(30_000) }),
     }).set(ticket.pathname, data.buffer, {
       onlyIfNew: true,
       metadata: { size },

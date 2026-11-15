@@ -96,3 +96,34 @@ test("a preview database cannot open live Stripe checkout", async (t) => {
     /Payments are unavailable in this test workspace/,
   );
 });
+test("offline cleanup uses the restored Netlify store credentials", async (t) => {
+  const env = {
+    NETLIFY_BLOBS_SITE_ID: "offline-test-site",
+    NETLIFY_BLOBS_TOKEN: "offline-test-token",
+  };
+  for (const [key, value] of Object.entries(env)) {
+    const previous = process.env[key];
+    process.env[key] = value;
+    t.after(() => {
+      if (previous === undefined) delete process.env[key];
+      else process.env[key] = previous;
+    });
+  }
+  const calls = t.mock.method(
+    globalThis,
+    "fetch",
+    async () => new Response(null, { status: 204 }),
+  );
+  const { deleteStored } = await import("../lib/storage");
+  await deleteStored("netlify:" + pathname);
+  assert.equal(calls.mock.callCount(), 1);
+  const [input, init] = calls.mock.calls[0].arguments;
+  assert.ok(input);
+  const request = new Request(input, init);
+  assert.equal(request.method, "DELETE");
+  assert.match(request.url, /offline-test-site/);
+  assert.equal(
+    request.headers.get("authorization"),
+    "Bearer offline-test-token",
+  );
+});

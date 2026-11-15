@@ -239,8 +239,8 @@ export async function publishJob(jid: string) {
           "AI cited evidence outside this brief; draft rejected",
         );
       await c.query(
-        "UPDATE briefs SET ai_proposal=$1 WHERE id=$2 AND user_id=$3",
-        [JSON.stringify(response.data), b.id, job.user_id],
+        "UPDATE briefs SET ai_proposal=$1,draft_evidence_ids=ARRAY(SELECT DISTINCT unnest(draft_evidence_ids || $4::uuid[])) WHERE id=$2 AND user_id=$3",
+        [JSON.stringify(response.data), b.id, job.user_id, [...allowed]],
       );
 
       usage = [response.usage];

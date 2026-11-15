@@ -1,9 +1,12 @@
+import { beginDirectSourceWrite } from "@/lib/source-write";
+import type pg from "pg";
+import { deleteDiscoverySource } from "@/lib/source-deletion";
 import { hostedJobs } from "@/lib/job-runner";
 import { NextRequest, NextResponse, after } from "next/server";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { ingestFiles, decodeFiles } from "@/lib/ingest";
-import { originalStream } from "@/lib/storage";
+import { cleanStorage, originalStream } from "@/lib/storage";
 import {
   query,
   transaction,
@@ -96,8 +99,13 @@ function versionCheck(record: Record<string, unknown>, version: number) {
       409,
     );
 }
-async function validIds(table: string, ids: string[], user: string) {
-  for (const value of ids) await owned(table, value, user);
+async function validIds(
+  table: string,
+  ids: string[],
+  user: string,
+  client: pg.PoolClient,
+) {
+  for (const value of ids) await owned(table, value, user, client);
 }
 async function authRoute(req: NextRequest, route: string, demo: boolean) {
   if (route === "auth/demo" && req.method === "POST") return startDemo(req);
@@ -161,6 +169,7 @@ async function authRoute(req: NextRequest, route: string, demo: boolean) {
   return { ok: true };
 }
 async function ingest(req: NextRequest, user: string) {
+  const origin = await beginDirectSourceWrite();
   let title = "",
     customer = "",
     files: { name: string; text: string }[] = [];
@@ -198,7 +207,7 @@ async function ingest(req: NextRequest, user: string) {
     customer = input.customer_id;
     files = [{ name: title + ".txt", text: input.content }];
   }
-  return ingestFiles(user, customer, title, files);
+  return ingestFiles(user, customer, title, files, origin);
 }
 const signalInput = z.object({
   title: text(200),
@@ -279,7 +288,8 @@ async function handle(req: NextRequest, parts: string[]) {
     !demo &&
     req.method !== "GET" &&
     parts[0] !== "settings" &&
-    parts[0] !== "account"
+    parts[0] !== "account" &&
+    !(req.method === "DELETE" && parts[0] === "sources" && parts.length === 2)
   )
     await assertWritableUser(user);
   if (
@@ -549,31 +559,9 @@ async function handle(req: NextRequest, parts: string[]) {
       };
     }
     if (req.method === "DELETE") {
-      await transaction(async (c) => {
-        const { rows } = await c.query(
-          "SELECT id FROM signals WHERE transcript_id=$1 AND user_id=$2",
-          [tid, user],
-        );
-        const ids = rows.map((s) => s.id);
-        await c.query(
-          "UPDATE assessments SET confirmed=false,evidence_ids=ARRAY(SELECT unnest(evidence_ids) EXCEPT SELECT unnest($1::uuid[])) WHERE user_id=$2 AND evidence_ids && $1::uuid[]",
-          [ids, user],
-        );
-        await c.query(
-          "INSERT INTO storage_deletions(pathname) VALUES($1) ON CONFLICT DO NOTHING",
-          [t.storage_path],
-        );
-        await c.query("DELETE FROM transcripts WHERE id=$1 AND user_id=$2", [
-          tid,
-          user,
-        ]);
-      });
-      await audit(
-        user,
-        "Transcript and supporting evidence removed",
-        "transcript",
-        tid,
-      );
+      const deleted = await deleteDiscoverySource(user, tid, null);
+      if (deleted.pending)
+        after(() => cleanStorage(deleted.receipt).catch(() => {}));
       return { ok: true };
     }
     if (parts[2] === "extract" && req.method === "POST")
@@ -732,9 +720,11 @@ async function handle(req: NextRequest, parts: string[]) {
       })
       .parse(await body(req));
     if (input.product_id) await owned("products", input.product_id, user);
-    await validIds("signals", input.signal_ids, user);
     const fid = id();
     await transaction(async (c) => {
+      await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
+      await validIds("signals", input.signal_ids, user, c);
+
       await c.query(
         "INSERT INTO features(id,user_id,title,description,product_id) VALUES($1,$2,$3,$4,$5)",
         [fid, user, input.title, input.description, input.product_id],
@@ -767,7 +757,6 @@ async function handle(req: NextRequest, parts: string[]) {
       .parse(await body(req));
     versionCheck(f, input.version);
     if (input.product_id) await owned("products", input.product_id, user);
-    await validIds("signals", input.signal_ids, user);
     const data = await bootstrap(user);
     const linked = data.signals.filter((s) => input.signal_ids.includes(s.id));
     const { rollup } = await import("@/lib/domain");
@@ -794,6 +783,9 @@ async function handle(req: NextRequest, parts: string[]) {
     )
       throw new AppError("Complete all readiness checks before promotion");
     await transaction(async (c) => {
+      await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
+      await validIds("signals", input.signal_ids, user, c);
+
       const result = await c.query(
         "UPDATE features SET title=$1,description=$2,product_id=$3,stage=$4,problem_clear=$5,validation_met=$6,route_chosen=$7,technical_route=$8,version=version+1 WHERE id=$9 AND user_id=$10 AND version=$11 RETURNING id",
         [
@@ -894,40 +886,48 @@ async function handle(req: NextRequest, parts: string[]) {
       })
       .parse(await body(req));
     await owned("customers", input.customer_id, user);
-    await validIds("signals", input.evidence_ids, user);
     if (input.confirmed && !input.evidence_ids.length)
       throw new AppError(
         "Link verified evidence before confirming this assessment",
       );
     if (input.confirmed && !input.level)
       throw new AppError("Choose an awareness level");
-    for (const sid of input.evidence_ids) {
-      const s = await owned("signals", sid, user);
+    const aid = id();
+    await transaction(async (c) => {
+      await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
+      const { rows } = await c.query(
+        "SELECT id,customer_id,verified,review FROM signals WHERE user_id=$1 AND id=ANY($2::uuid[])",
+        [user, input.evidence_ids],
+      );
+      if (rows.length !== new Set(input.evidence_ids).size)
+        throw new AppError("Signal not found", 404);
       if (
-        s.customer_id !== input.customer_id ||
-        (input.confirmed && (!s.verified || s.review !== "approved"))
+        rows.some(
+          (s) =>
+            s.customer_id !== input.customer_id ||
+            (input.confirmed && (!s.verified || s.review !== "approved")),
+        )
       )
         throw new AppError(
           "Assessment evidence must be approved and belong to this customer",
         );
-    }
-    const aid = id();
-    await query(
-      "INSERT INTO assessments(id,user_id,customer_id,problem,level,suggested_level,business_purpose,constraints,buying_authority,evidence_ids,confirmed) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(user_id,customer_id,problem) DO UPDATE SET level=EXCLUDED.level,suggested_level=EXCLUDED.suggested_level,business_purpose=EXCLUDED.business_purpose,constraints=EXCLUDED.constraints,buying_authority=EXCLUDED.buying_authority,evidence_ids=EXCLUDED.evidence_ids,confirmed=EXCLUDED.confirmed",
-      [
-        aid,
-        user,
-        input.customer_id,
-        input.problem,
-        input.level,
-        input.suggested_level,
-        input.business_purpose,
-        input.constraints,
-        input.buying_authority,
-        input.evidence_ids,
-        input.confirmed,
-      ],
-    );
+      await c.query(
+        "INSERT INTO assessments(id,user_id,customer_id,problem,level,suggested_level,business_purpose,constraints,buying_authority,evidence_ids,confirmed) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(user_id,customer_id,problem) DO UPDATE SET level=EXCLUDED.level,suggested_level=EXCLUDED.suggested_level,business_purpose=EXCLUDED.business_purpose,constraints=EXCLUDED.constraints,buying_authority=EXCLUDED.buying_authority,evidence_ids=EXCLUDED.evidence_ids,confirmed=EXCLUDED.confirmed",
+        [
+          aid,
+          user,
+          input.customer_id,
+          input.problem,
+          input.level,
+          input.suggested_level,
+          input.business_purpose,
+          input.constraints,
+          input.buying_authority,
+          input.evidence_ids,
+          input.confirmed,
+        ],
+      );
+    });
     await audit(
       user,
       "Problem awareness assessed",
@@ -949,10 +949,12 @@ async function handle(req: NextRequest, parts: string[]) {
         signal_ids: z.array(uuid).max(200).default([]),
       })
       .parse(await body(req));
-    await validIds("features", input.feature_ids, user);
-    await validIds("signals", input.signal_ids, user);
     const bid = id();
     await transaction(async (c) => {
+      await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
+      await validIds("features", input.feature_ids, user, c);
+      await validIds("signals", input.signal_ids, user, c);
+
       await c.query("INSERT INTO briefs(id,user_id,title) VALUES($1,$2,$3)", [
         bid,
         user,
@@ -991,13 +993,14 @@ async function handle(req: NextRequest, parts: string[]) {
       ].map((k) => (b.edited[k] ? b[k] : k === "options" ? options : p[k]));
       await transaction(async (c) => {
         const r = await c.query(
-          "UPDATE briefs SET ask=$1,problem=$2,audience=$3,capability=$4,impact=$5,options=$6,ai_proposal=NULL,version=version+1 WHERE id=$7 AND user_id=$8 AND version=$9 RETURNING id",
+          "UPDATE briefs SET ask=$1,problem=$2,audience=$3,capability=$4,impact=$5,options=$6,ai_proposal=NULL,draft_evidence_ids=ARRAY(SELECT DISTINCT unnest(draft_evidence_ids || $10::uuid[])),version=version+1 WHERE id=$7 AND user_id=$8 AND version=$9 RETURNING id",
           [
             ...values.slice(0, 5),
             JSON.stringify(values[5]),
             bid,
             user,
             b.version,
+            z.array(uuid).catch([]).parse(p.evidence_ids),
           ],
         );
         if (!r.rowCount)
@@ -1048,8 +1051,6 @@ async function handle(req: NextRequest, parts: string[]) {
         throw new AppError(
           "Keep both Do nothing and Maintain current approach options",
         );
-      await validIds("features", input.feature_ids, user);
-      await validIds("signals", input.signal_ids, user);
       const edited = { ...b.edited };
       for (const k of [
         "ask",
@@ -1062,6 +1063,10 @@ async function handle(req: NextRequest, parts: string[]) {
         if (!isDeepStrictEqual(input[k as keyof typeof input], b[k]))
           edited[k] = true;
       await transaction(async (c) => {
+        await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
+        await validIds("features", input.feature_ids, user, c);
+        await validIds("signals", input.signal_ids, user, c);
+
         const r = await c.query(
           "UPDATE briefs SET title=$1,ask=$2,problem=$3,audience=$4,capability=$5,impact=$6,options=$7,status=$8,review_date=$9,revisit_if=$10,edited=$11,version=version+1 WHERE id=$12 AND user_id=$13 AND version=$14 RETURNING id",
           [

@@ -63,34 +63,56 @@ async function companyByName(c: pg.PoolClient, user: string, name: string) {
   );
   return company;
 }
-export async function loadResearch(user: string) {
+export const transcriptFingerprintSql =
+  "encode(sha256(convert_to(replace(encode(convert_to(raw_text,'UTF8'),'base64'),E'\\n',''),'UTF8')),'hex')";
+
+export async function loadResearch(
+  user: string,
+  client?: pg.PoolClient,
+  excluding: {
+    sourceId?: string;
+    transcriptIds: string[];
+    reportIds: string[];
+  } = { transcriptIds: [], reportIds: [] },
+) {
+  // A transaction client can execute only one statement at a time.
+  let previous: Promise<unknown> = Promise.resolve();
+  const read: typeof query = client
+    ? (sql, params) => {
+        const result = previous.then(
+          async () => (await client.query(sql, params)).rows,
+        );
+        previous = result;
+        return result;
+      }
+    : query;
   const results = await Promise.all([
-    query<Company>(
+    read<Company>(
       "SELECT id,name,merged_into,research_version FROM customers WHERE user_id=$1",
       [user],
     ),
-    query(
+    read(
       "SELECT name_key,company_id FROM research_company_aliases WHERE user_id=$1",
       [user],
     ),
-    query(
+    read(
       `SELECT s.id,s.sha256 AS fingerprint,'source' AS kind,s.filename,s.created_at::text,left(s.pages->0->>'text',4000) AS header,
       coalesce((SELECT rs.role FROM discovery_report_sources rs JOIN discovery_reports r ON r.id=rs.report_id AND r.user_id=rs.user_id
-      WHERE rs.source_id=s.id AND rs.user_id=$1 AND r.result IS NOT NULL ORDER BY r.created_at DESC,r.id DESC LIMIT 1),s.role) AS role
-      FROM discovery_sources s WHERE s.user_id=$1`,
-      [user],
+      WHERE rs.source_id=s.id AND rs.user_id=$1 AND NOT r.id=ANY($2::uuid[]) AND r.result IS NOT NULL ORDER BY r.created_at DESC,r.id DESC LIMIT 1),s.role) AS role
+      FROM discovery_sources s WHERE s.user_id=$1 AND s.id IS DISTINCT FROM $3`,
+      [user, excluding.reportIds, excluding.sourceId ?? null],
     ),
-    query(
+    read(
       `SELECT t.id,t.fingerprint,'transcript' AS kind,t.title AS filename,t.created_at::text,left(t.raw_text,4000) AS header,'customer' AS role,t.customer_id,
-      (SELECT s.id FROM discovery_sources s WHERE s.user_id=$1 AND s.sha256=t.fingerprint ORDER BY s.created_at,s.id LIMIT 1) AS discovery_source_id
-      FROM (SELECT *,encode(sha256(convert_to(replace(encode(convert_to(raw_text,'UTF8'),'base64'),E'\\n',''),'UTF8')),'hex') AS fingerprint FROM transcripts WHERE user_id=$1) t`,
-      [user],
+      (SELECT s.id FROM discovery_sources s WHERE s.user_id=$1 AND s.id IS DISTINCT FROM $2 AND s.sha256=t.fingerprint ORDER BY s.created_at,s.id LIMIT 1) AS discovery_source_id
+      FROM (SELECT *,${transcriptFingerprintSql} AS fingerprint FROM transcripts WHERE user_id=$1 AND NOT id=ANY($3::uuid[])) t`,
+      [user, excluding.sourceId ?? null, excluding.transcriptIds],
     ),
-    query(
+    read(
       `WITH source_jobs AS (
       SELECT DISTINCT j.id,j.created_at,p->>'source_id' AS source_id FROM jobs j
       JOIN job_chunks c ON c.job_id=j.id CROSS JOIN LATERAL jsonb_array_elements(c.input) p
-      WHERE j.user_id=$1 AND j.purpose='analyze' AND j.state='succeeded'
+      WHERE j.user_id=$1 AND j.purpose='analyze' AND j.state='succeeded' AND NOT j.report_id=ANY($2::uuid[])
     ), latest AS (SELECT DISTINCT ON(source_id) * FROM source_jobs ORDER BY source_id,created_at DESC,id DESC),
     extracted AS (
       SELECT l.source_id::uuid AS source_id,l.created_at::text,
@@ -100,28 +122,28 @@ export async function loadResearch(user: string) {
       SELECT DISTINCT ON(rs.source_id) rs.source_id,r.created_at::text,
       coalesce((SELECT jsonb_agg(f) FROM jsonb_array_elements(r.result->'findings') f WHERE f->>'source_id'=rs.source_id::text),'[]'::jsonb) AS findings,false AS extracted
       FROM discovery_report_sources rs JOIN discovery_reports r ON r.id=rs.report_id AND r.user_id=rs.user_id
-      WHERE rs.user_id=$1 AND r.result IS NOT NULL ORDER BY rs.source_id,r.created_at DESC,r.id DESC
+      WHERE rs.user_id=$1 AND NOT r.id=ANY($2::uuid[]) AND r.result IS NOT NULL ORDER BY rs.source_id,r.created_at DESC,r.id DESC
     ) SELECT * FROM extracted UNION ALL SELECT * FROM saved WHERE source_id NOT IN(SELECT source_id FROM extracted)`,
-      [user],
+      [user, excluding.reportIds],
     ),
-    query(
+    read(
       `SELECT s.id,s.transcript_id,s.quote,s.source_start,s.title,s.sentiment,s.timestamp,s.verified,s.review,s.created_at::text,
       (SELECT f.title FROM feature_signals fs JOIN features f ON f.id=fs.feature_id AND f.user_id=fs.user_id WHERE fs.signal_id=s.id AND fs.user_id=$1 ORDER BY f.id LIMIT 1) AS theme
-      FROM signals s WHERE s.user_id=$1`,
-      [user],
+      FROM signals s WHERE s.user_id=$1 AND NOT s.transcript_id=ANY($2::uuid[])`,
+      [user, excluding.transcriptIds],
     ),
-    query(
+    read(
       "SELECT *,meeting_date::text FROM research_document_edits WHERE user_id=$1",
       [user],
     ),
-    query("SELECT * FROM research_signal_edits WHERE user_id=$1", [user]),
-    query<{ problem: string; theme: string }>(
+    read("SELECT * FROM research_signal_edits WHERE user_id=$1", [user]),
+    read<{ problem: string; theme: string }>(
       `SELECT f->>'problem' AS problem,o->>'title' AS theme FROM discovery_reports r
       CROSS JOIN LATERAL jsonb_array_elements(r.result->'opportunities') WITH ORDINALITY AS opportunities(o,ord)
       CROSS JOIN LATERAL jsonb_array_elements(r.result->'findings') f
-      WHERE r.user_id=$1 AND ((o->'supporting_ids') ? (f->>'id') OR (o->'opposing_ids') ? (f->>'id') OR (o->'risk_ids') ? (f->>'id') OR (o->'context_ids') ? (f->>'id'))
+      WHERE r.user_id=$1 AND NOT r.id=ANY($2::uuid[]) AND ((o->'supporting_ids') ? (f->>'id') OR (o->'opposing_ids') ? (f->>'id') OR (o->'risk_ids') ? (f->>'id') OR (o->'context_ids') ? (f->>'id'))
       ORDER BY r.created_at,r.id,opportunities.ord`,
-      [user],
+      [user, excluding.reportIds],
     ),
   ]);
   return buildResearch({
@@ -152,6 +174,62 @@ export async function researchApi(
       [user, q],
     );
     return { items };
+  }
+  if (parts[1] === "signals" && parts[2] && req.method === "PATCH") {
+    const skey = z
+      .string()
+      .regex(/^[a-f0-9]{32}$/)
+      .parse(parts[2]);
+    const input = z
+      .object({
+        version,
+        theme: z.string().trim().min(1).max(300).optional(),
+        company_name: z.string().trim().max(120).optional(),
+        hidden: z.boolean().optional(),
+      })
+      .parse(await body());
+    await transaction(async (c) => {
+      await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
+      const current = await loadResearch(user, c);
+      if (!current.signals.some((s) => s.key === skey))
+        throw new AppError("Signal not found", 404);
+      const company = input.company_name
+        ? await companyByName(c, user, input.company_name)
+        : null;
+      const { rows } = await c.query(
+        "SELECT * FROM research_signal_edits WHERE user_id=$1 AND signal_key=$2 FOR UPDATE",
+        [user, skey],
+      );
+      const old = rows[0];
+      if ((old?.version ?? 0) !== input.version)
+        throw new AppError("Signal changed. Refresh before saving.", 409);
+      const values = [
+        user,
+        skey,
+        input.company_name === undefined
+          ? (old?.company_id ?? null)
+          : (company?.id ?? null),
+        input.company_name === undefined
+          ? (old?.company_override ?? false)
+          : true,
+        input.theme ?? old?.theme ?? null,
+        input.hidden ?? old?.hidden ?? false,
+      ];
+      if (old)
+        await c.query(
+          "UPDATE research_signal_edits SET company_id=$3,company_override=$4,theme=$5,hidden=$6,version=version+1 WHERE user_id=$1 AND signal_key=$2",
+          values,
+        );
+      else {
+        const inserted = await c.query(
+          "INSERT INTO research_signal_edits(user_id,signal_key,company_id,company_override,theme,hidden) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING RETURNING version",
+          values,
+        );
+        if (!inserted.rowCount)
+          throw new AppError("Signal changed. Refresh before saving.", 409);
+      }
+    });
+    return { ok: true };
   }
   const data = await loadResearch(user);
   const documents = data.conversations.map((d) => ({
@@ -217,6 +295,9 @@ export async function researchApi(
           user,
           doc.filename.slice(0, 190) + ".txt",
           Buffer.from(transcript.raw_text),
+          null,
+          null,
+          { legacyTranscriptId: doc.id },
         );
         sourceId = source.id;
       }
@@ -417,60 +498,6 @@ export async function researchApi(
             );
       if (!result.rowCount)
         throw new AppError("Conversation changed. Refresh before saving.", 409);
-    });
-    return { ok: true };
-  }
-  if (parts[1] === "signals" && parts[2] && req.method === "PATCH") {
-    const skey = z
-      .string()
-      .regex(/^[a-f0-9]{32}$/)
-      .parse(parts[2]);
-    if (!data.signals.some((s) => s.key === skey))
-      throw new AppError("Signal not found", 404);
-    const input = z
-      .object({
-        version,
-        theme: z.string().trim().min(1).max(300).optional(),
-        company_name: z.string().trim().max(120).optional(),
-        hidden: z.boolean().optional(),
-      })
-      .parse(await body());
-    await transaction(async (c) => {
-      const company = input.company_name
-        ? await companyByName(c, user, input.company_name)
-        : null;
-      const { rows } = await c.query(
-        "SELECT * FROM research_signal_edits WHERE user_id=$1 AND signal_key=$2 FOR UPDATE",
-        [user, skey],
-      );
-      const old = rows[0];
-      if ((old?.version ?? 0) !== input.version)
-        throw new AppError("Signal changed. Refresh before saving.", 409);
-      const values = [
-        user,
-        skey,
-        input.company_name === undefined
-          ? (old?.company_id ?? null)
-          : (company?.id ?? null),
-        input.company_name === undefined
-          ? (old?.company_override ?? false)
-          : true,
-        input.theme ?? old?.theme ?? null,
-        input.hidden ?? old?.hidden ?? false,
-      ];
-      if (old)
-        await c.query(
-          "UPDATE research_signal_edits SET company_id=$3,company_override=$4,theme=$5,hidden=$6,version=version+1 WHERE user_id=$1 AND signal_key=$2",
-          values,
-        );
-      else {
-        const inserted = await c.query(
-          "INSERT INTO research_signal_edits(user_id,signal_key,company_id,company_override,theme,hidden) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING RETURNING version",
-          values,
-        );
-        if (!inserted.rowCount)
-          throw new AppError("Signal changed. Refresh before saving.", 409);
-      }
     });
     return { ok: true };
   }

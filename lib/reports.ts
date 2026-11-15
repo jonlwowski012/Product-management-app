@@ -35,6 +35,7 @@ import {
 } from "./discovery-limits";
 import { providerIds } from "./providers";
 import { billingStatus } from "./billing";
+import { lockSourceWrite, type SourceWrite } from "./source-write";
 import { uniqueSourceSelections } from "./source-deduplication";
 import {
   evidenceGroups,
@@ -53,6 +54,7 @@ export async function discoverySource(
   buffer: Buffer,
   storage: string | null = null,
   storageKey: string | null = null,
+  origin?: SourceWrite,
 ) {
   await assertWritableUser(user);
   const sha = hash(buffer.toString("base64"));
@@ -63,59 +65,84 @@ export async function discoverySource(
   if (existing) return { id: existing.id, duplicate: true };
   const parsed = await readDocument(name, buffer),
     sid = id();
-  if (!storage && blobEnabled()) {
-    const pathname = `source-originals/${user}/${sid}`;
+  const incomingStorage = Boolean(storage);
+  const pathname =
+    !storage && blobEnabled() ? `source-originals/${user}/${sid}` : null;
+  if (pathname) {
     storageKey = privateKey(pathname);
     await query(
       "INSERT INTO storage_deletions(pathname,not_before) VALUES($1,now()+interval '1 day') ON CONFLICT DO NOTHING",
       [storageKey],
     );
-    storage = await putPrivate(pathname, buffer, "application/octet-stream");
-  } else if (!storage && !process.env.SITE_ID) {
-    const folder = path.resolve(
-      process.env.DATA_DIR ?? ".data",
-      "sources",
-      user,
-    );
-    await mkdir(folder, { recursive: true, mode: 0o700 });
-    storage = path.join(folder, sid);
-    await writeFile(storage, buffer, { mode: 0o600 });
   }
-  if (!storage)
-    throw new AppError("Private Blob storage is not configured", 503);
   let row;
   try {
-    [row] = await query(
-      "INSERT INTO discovery_sources(id,user_id,filename,sha256,pages,warnings,storage_path,storage_key,original_bytes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(user_id,sha256) DO UPDATE SET filename=discovery_sources.filename RETURNING id",
-      [
-        sid,
-        user,
-        name,
-        sha,
-        JSON.stringify(parsed.pages),
-        JSON.stringify(parsed.warnings),
-        storage,
-        storageKey,
-        buffer.length,
-      ],
-    );
+    const insert = async (write: typeof query) => {
+      if (pathname) {
+        storage = await putPrivate(
+          pathname,
+          buffer,
+          "application/octet-stream",
+        );
+      } else if (!storage && !process.env.SITE_ID) {
+        const folder = path.resolve(
+          process.env.DATA_DIR ?? ".data",
+          "sources",
+          user,
+        );
+        await mkdir(folder, { recursive: true, mode: 0o700 });
+        storage = path.join(folder, sid);
+        await writeFile(storage, buffer, { mode: 0o600 });
+      }
+      if (!storage)
+        throw new AppError("Private Blob storage is not configured", 503);
+      return write(
+        "INSERT INTO discovery_sources(id,user_id,filename,sha256,pages,warnings,storage_path,storage_key,original_bytes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(user_id,sha256) DO UPDATE SET filename=discovery_sources.filename RETURNING id",
+        [
+          sid,
+          user,
+          name,
+          sha,
+          JSON.stringify(parsed.pages),
+          JSON.stringify(parsed.warnings),
+          storage,
+          storageKey,
+          buffer.length,
+        ],
+      );
+    };
+    [row] = origin
+      ? await transaction(async (c) => {
+          await lockSourceWrite(c, user, origin);
+          return insert(
+            async (sql, params) => (await c.query(sql, params)).rows,
+          );
+        })
+      : await insert(query);
   } catch (error) {
-    if (storage) await scheduleDeletion(storage);
+    if (!incomingStorage && storage) await scheduleDeletion(storage);
     throw error;
   }
-  if (row.id !== sid && storage) await scheduleDeletion(storage);
+  if (row.id !== sid && !incomingStorage && storage)
+    await scheduleDeletion(storage);
   return { id: row.id, duplicate: row.id !== sid };
 }
 export async function discoveryUpload(
   user: string,
   name: string,
   buffer: Buffer,
-  storage: string | null = null,
-  storageKey: string | null = null,
+  storage: string,
+  storageKey: string,
+  upload: Extract<SourceWrite, { claim: unknown }> & {
+    recordHashes: (hashes: string[]) => Promise<void>;
+  },
 ) {
   const warnings: string[] = [];
   const files = discoveryFiles(name, buffer, (warning) =>
     warnings.push(warning),
+  );
+  await upload.recordHashes(
+    files.map((file) => hash(file.buffer.toString("base64"))),
   );
   const archive = name.toLowerCase().endsWith(".zip");
   const sources = [];
@@ -127,6 +154,7 @@ export async function discoveryUpload(
         file.buffer,
         archive ? null : storage,
         archive ? null : storageKey,
+        upload,
       )),
       bytes: file.buffer.length,
     });
@@ -213,7 +241,7 @@ export async function reportDetail(
       [rid, user],
     ),
     query(
-      "SELECT j.id,j.state,j.error,j.attempts,j.billing_mode,(SELECT count(*)::int FROM job_chunks WHERE job_id=j.id) AS total,(SELECT count(*)::int FROM job_chunks WHERE job_id=j.id AND completed) AS completed,(SELECT count(*)::int FROM job_reductions WHERE job_id=j.id) AS reduction_total,(SELECT count(*)::int FROM job_reductions WHERE job_id=j.id AND completed) AS reduction_completed,(SELECT coalesce(max(level),0)::int+1 FROM job_reductions WHERE job_id=j.id) AS reduction_pass FROM jobs j WHERE j.report_id=$1 AND j.user_id=$2 ORDER BY j.created_at DESC LIMIT 1",
+      "SELECT j.id,j.state,j.error,j.attempts,j.billing_mode,j.provider,(SELECT count(*)::int FROM job_chunks WHERE job_id=j.id) AS total,(SELECT count(*)::int FROM job_chunks WHERE job_id=j.id AND completed) AS completed,(SELECT count(*)::int FROM job_reductions WHERE job_id=j.id) AS reduction_total,(SELECT count(*)::int FROM job_reductions WHERE job_id=j.id AND completed) AS reduction_completed,(SELECT coalesce(max(level),0)::int+1 FROM job_reductions WHERE job_id=j.id) AS reduction_pass FROM jobs j WHERE j.report_id=$1 AND j.user_id=$2 ORDER BY j.created_at DESC LIMIT 1",
       [rid, user],
     ),
     query(
@@ -290,6 +318,7 @@ export async function reportDetail(
 export async function retryOmittedMaterial(user: string, rid: string) {
   await assertWritableUser(user);
   const recovered = await transaction(async (c) => {
+    await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
     const {
       rows: [source],
     } = await c.query(
