@@ -59,8 +59,7 @@ Stripe Checkout and the customer portal manage subscriptions. Configure `STRIPE_
 After paid access ends, work remains readable/exportable for 30 days and is then scheduled for deletion. Maintenance checks Stripe directly before expiry deletion so a missed renewal webhook does not destroy paid work. At the end of the export window, it expires open checkouts, cancels remaining subscriptions, and voids unpaid subscription invoices (discarding drafts) before deleting the workspace. A newly settled payment defers cleanup. Account deletion immediately blocks new work and clears API keys, cancels open checkout/subscriptions and closes their unpaid invoices, then deletes account records and queues private originals for cleanup. External cancellation failures leave a deletion request that maintenance retries; never clear it manually to reactivate a deleted account.
 
 Password changes and signing out all sessions work in Settings. Email-based
-password recovery remains unavailable. Private beta signup uses Resend to send
-verification codes. See [Beta email setup](#beta-email-setup) for the sender configuration.
+password recovery is unavailable.
 
 `/pricing`, `/help`, `/privacy`, and `/terms` describe the offer and data handling. Set `LEGAL_OPERATOR_NAME` and `SUPPORT_EMAIL` to real business information before sales, and review the policy drafts for the countries served. Signup requires an unchecked, explicit acceptance of the current User Agreement at `/terms`; the API rejects missing, false, or stale acceptance. Account creation and an audit receipt (server timestamp, version, full agreement, operator, and contact) commit in one transaction. The receipt is always included in account exports, even after it falls outside the recent activity list, and follows account deletion/backup retention. Existing accounts are not marked as having accepted these new terms. Have counsel review the agreement for your business and customers; no exclusive jurisdiction or arbitration is assumed. Provider credentials pass through Evidence servers; BYOK is not local-only processing. The plan does not promise enterprise compliance or uptime guarantees.
 
@@ -229,31 +228,21 @@ Vercel plan covers an invited beta for a future paid product before enabling it.
   take the final production snapshot. Keep the source and target backups and
   update the operations URL after validating the new deployment.
 
-### Beta email setup
+### Beta access management
 
-These settings are required on Vercel and Netlify while beta mode is enabled.
-
-- Configure `RESEND_API_KEY` with a sending-only Resend key and
-  `BETA_EMAIL_FROM` with a sender on a verified domain in the target
-  environment. Beta signups and first-time activation require an emailed
-  eight-digit code. Use a separate sending key for staging.
 - Sign in as `jonathan.lwowski@gmail.com` on the target environment and open
   `/api/auth` to find your signed-in account's `user.id`. Set
-  `BETA_ADMIN_USER_ID` to that ID and redeploy. If an admin account needs to
-  be created first, set `DIRECT_DATABASE_URL` to the target environment and run
-  `npx tsx scripts/beta-approve.ts jonathan.lwowski@gmail.com`, then sign up
-  with the emailed code.
-- Open `/admin/beta` to add and remove approved emails. Testers visit the normal
-  homepage. Existing account owners can use **Activate beta access** on the
-  sign-in form. Each environment has ten slots. Removing someone frees their
-  slot and removes beta access. Former subscribers get at least 30 days to
-  export their research. The new release stops accepting invite links and
-  reuses unused slots. Migration 021 preserves previously claimed access
-  and keeps the old schema usable during deployment and rollback. After a
-  revocation, use a build that reads `beta_export_until` for any rollback.
-  Earlier builds defer automatic cleanup but cannot show or honor that export
-  deadline. If an earlier build is needed temporarily, restore a compatible
-  build before relying on self-service export.
+  `BETA_ADMIN_USER_ID` to that ID and redeploy.
+- Testers create an account on the normal homepage. Signups alone do not
+  grant beta access. After a tester confirms through a channel you trust that
+  they created their account, enter their signup email in `/admin/beta`.
+  The app attaches access to that account. It does not verify email ownership.
+- Each environment has ten slots. Removing someone frees their slot and
+  removes beta access. Former subscribers get at least 30 days to export
+  their research. The new release stops accepting invite links and reuses
+  unused slots. Migration 021 preserves previously claimed access and keeps
+  the old schema usable during deployment and rollback. After a revocation,
+  use a rollback build that reads `beta_export_until`.
 
 ### Transcript security and recovery
 

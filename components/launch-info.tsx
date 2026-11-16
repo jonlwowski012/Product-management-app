@@ -77,7 +77,7 @@ export function LaunchInfo({
             </li>
             <li>
               {beta
-                ? "Use your approved email address to sign up."
+                ? "Create an account and ask the beta admin to approve it."
                 : "Create an account with your email and a strong password."}
             </li>
             <li>
@@ -151,8 +151,7 @@ export function LaunchInfo({
           <p>
             We do not sell your uploaded material or use it to train our own
             models. Operational metrics must exclude source text and secrets.
-            Authentication uses essential session cookies. For beta access,
-            Resend delivers verification codes to approved email addresses.
+            Authentication uses essential session cookies.
           </p>
           <p>
             You can delete a saved transcript from its source view. The

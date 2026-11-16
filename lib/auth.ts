@@ -3,8 +3,6 @@ export { hashPassword, checkPassword, encrypt, decrypt } from "./crypto";
 import { randomBytes, createHash, createHmac } from "node:crypto";
 import { cookies } from "next/headers";
 import { query, transaction, AppError, id } from "./db";
-import { claimBetaApproval, lockBetaApproval } from "./beta-approval";
-import { betaEnabled } from "./beta-config";
 import { DEMO_EMAIL } from "./demo-constants";
 import { AGREEMENT_VERSION, userAgreement } from "./user-agreement";
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -115,7 +113,6 @@ export async function register(
   name: string,
   password: string,
   acceptance: { accepted: unknown; version: unknown },
-  betaCode?: string,
 ) {
   if (acceptance.accepted !== true || acceptance.version !== AGREEMENT_VERSION)
     throw new AppError(
@@ -125,15 +122,11 @@ export async function register(
     throw new AppError("This address is reserved for the public demo", 400);
   const user = id();
   await transaction(async (c) => {
-    const approval = betaEnabled()
-      ? await lockBetaApproval(c, email.toLowerCase(), betaCode)
-      : null;
     await c.query(
       "INSERT INTO users(id,email,name,password_hash) VALUES($1,$2,$3,$4)",
       [user, email.toLowerCase(), name, hashPassword(password)],
     );
     await c.query("INSERT INTO settings(user_id) VALUES($1)", [user]);
-    if (approval) await claimBetaApproval(c, approval, user);
     await c.query(
       "INSERT INTO audit(id,user_id,action,entity_type,entity_id,detail) VALUES($1,$2,'user_agreement.accepted','user',$2,$3)",
       [id(), user, JSON.stringify(userAgreement())],

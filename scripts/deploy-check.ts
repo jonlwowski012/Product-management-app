@@ -17,12 +17,6 @@ for (const name of [
   if (!process.env[name])
     throw new Error("Missing deployment variable: " + name);
 }
-if (process.env.BETA_MODE === "true") {
-  for (const name of ["RESEND_API_KEY", "BETA_EMAIL_FROM"]) {
-    if (!process.env[name]?.trim())
-      throw new Error("Missing beta deployment variable: " + name);
-  }
-}
 if (
   (target === "preview" || process.env.BETA_MODE === "true") &&
   !/^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY || "")

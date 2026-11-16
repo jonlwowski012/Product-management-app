@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { BETA_SEATS } from "@/lib/beta-config";
 import { manageApproval } from "./actions";
 
-export type Approval = { id: string; email: string; active: boolean };
+export type Approval = { id: string; email: string };
 
 export function ApprovalList({ approvals }: { approvals: Approval[] }) {
   const [result, action, pending] = useActionState(manageApproval, {});
@@ -14,6 +14,9 @@ export function ApprovalList({ approvals }: { approvals: Approval[] }) {
     <div className="stack">
       <p>
         {available} of {BETA_SEATS} slots available
+      </p>
+      <p>
+        Approve an email after the tester confirms they created their account.
       </p>
       <form action={action} className="stack">
         <label className="field">
@@ -44,8 +47,7 @@ export function ApprovalList({ approvals }: { approvals: Approval[] }) {
           <ul aria-label="Approved beta emails">
             {approvals.map((approval) => (
               <li key={approval.id}>
-                {approval.email} ·{" "}
-                {approval.active ? "Active" : "Awaiting verification"}{" "}
+                {approval.email}{" "}
                 <button
                   className="button ghost"
                   name="remove"

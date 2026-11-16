@@ -1,10 +1,3 @@
-import { betaEnabled } from "@/lib/beta-config";
-import {
-  betaEmailSettings,
-  claimBetaApproval,
-  lockBetaApproval,
-  sendBetaCode,
-} from "@/lib/beta-approval";
 import { beginDirectSourceWrite } from "@/lib/source-write";
 import type pg from "pg";
 import { deleteDiscoverySource } from "@/lib/source-deletion";
@@ -126,33 +119,13 @@ async function authRoute(req: NextRequest, route: string, demo: boolean) {
       "The demo workspace is read only. Create your own workspace to make changes.",
       403,
     );
-  if (
-    !["auth/login", "auth/register", "auth/beta-code"].includes(route) ||
-    req.method !== "POST"
-  )
+  if (!["auth/login", "auth/register"].includes(route) || req.method !== "POST")
     throw new AppError("Route not found", 404);
   const address = (
     req.headers.get("x-real-ip") ??
     req.headers.get("x-forwarded-for")?.split(",")[0] ??
     "unknown"
   ).slice(0, 256);
-  if (route === "auth/beta-code") {
-    if (!betaEnabled()) throw new AppError("Route not found", 404);
-    await accountRateLimit("beta-code-ip:" + address, 30);
-    const { email } = z
-      .object({ email: z.email().max(254) })
-      .parse(await body(req));
-    const identity = email.toLowerCase();
-    const settings = betaEmailSettings();
-    after(async () => {
-      try {
-        await sendBetaCode(identity, settings);
-      } catch {
-        console.error("Could not process beta verification email");
-      }
-    });
-    return { ok: true };
-  }
   await accountRateLimit("auth-ip:" + address, 100);
   const input = z
     .object({
@@ -161,20 +134,10 @@ async function authRoute(req: NextRequest, route: string, demo: boolean) {
       name: text(80).optional(),
       agreement_accepted: z.unknown().optional(),
       agreement_version: z.unknown().optional(),
-      beta_code: z
-        .string()
-        .regex(/^\d{8}$/)
-        .optional(),
     })
     .parse(await body(req));
   const identity = input.email.toLowerCase();
-  const betaRegistration = betaEnabled() && route === "auth/register";
-  const attemptIdentity = await accountRateLimit(
-    (betaRegistration ? "beta-register:" : "auth-email:") + identity,
-    10,
-  );
-  if (betaRegistration && input.beta_code)
-    await accountRateLimit("beta-signup-code:" + identity, 8);
+  const attemptIdentity = await accountRateLimit("auth-email:" + identity, 10);
   if (route === "auth/register") {
     try {
       const user = await register(
@@ -185,7 +148,6 @@ async function authRoute(req: NextRequest, route: string, demo: boolean) {
           accepted: input.agreement_accepted,
           version: input.agreement_version,
         },
-        input.beta_code,
       );
       return { id: user };
     } catch (e) {
@@ -200,19 +162,6 @@ async function authRoute(req: NextRequest, route: string, demo: boolean) {
   );
   if (!user || !checkPassword(input.password, user.password_hash))
     throw new AppError("Email or password is incorrect", 401);
-  if (betaEnabled() && input.beta_code) {
-    await accountRateLimit("beta-activation-code:" + identity, 8);
-    await transaction(async (c) => {
-      const locked = await c.query(
-        "SELECT id FROM users WHERE id=$1 AND password_hash=$2 AND deletion_requested_at IS NULL FOR UPDATE",
-        [user.id, user.password_hash],
-      );
-      if (!locked.rowCount)
-        throw new AppError("Sign in again to activate beta access.", 401);
-      const approval = await lockBetaApproval(c, identity, input.beta_code);
-      await claimBetaApproval(c, approval, user.id);
-    });
-  }
   await newSession(user.id, false, user.password_hash);
   await query("DELETE FROM auth_attempts WHERE identity=$1", [attemptIdentity]);
   return { ok: true };

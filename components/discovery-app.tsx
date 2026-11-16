@@ -35,11 +35,6 @@ function Auth({
   const [mode, setMode] = useState<"login" | "register">("register"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  const [activating, setActivating] = useState(false);
-  const [codeSending, setCodeSending] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
-  const showCode = beta && (mode === "register" || activating);
-
   return (
     <div className="marketing-home">
       <header className="home-nav">
@@ -91,7 +86,7 @@ function Auth({
             </a>
             <p className="home-price-note">
               {beta
-                ? "Free private beta · Approved email required"
+                ? "Free private beta · Admin approval required"
                 : "$10/month · All features · Bring your own AI API key"}
               <br />
               AI usage billed separately by your provider.
@@ -405,7 +400,7 @@ function Auth({
               <p>
                 {mode === "register"
                   ? beta
-                    ? "Sign up with your approved beta email address."
+                    ? "Create an account, then ask the beta admin to approve your signup."
                     : "Create an account, connect your AI API key, and subscribe when you’re ready to work with your own transcripts."
                   : "Sign in to your evidence workspace."}
               </p>
@@ -423,9 +418,6 @@ function Auth({
                             agreement_accepted: form.has("agreement"),
                             agreement_version: AGREEMENT_VERSION,
                           }
-                        : {}),
-                      ...(form.get("beta_code")
-                        ? { beta_code: form.get("beta_code") }
                         : {}),
                       email: form.get("email"),
                       password: form.get("password"),
@@ -461,73 +453,6 @@ function Auth({
                     placeholder="you@example.com"
                   />
                 </label>
-                {beta && mode === "login" && (
-                  <button
-                    className="text-link"
-                    type="button"
-                    onClick={() => {
-                      setActivating(!activating);
-                      setCodeSent(false);
-                      setError("");
-                    }}
-                  >
-                    {activating
-                      ? "Use regular sign-in"
-                      : "Activate beta access"}
-                  </button>
-                )}
-                {showCode && (
-                  <>
-                    <div>
-                      <button
-                        className="button secondary"
-                        type="button"
-                        disabled={codeSending || busy}
-                        onClick={async ({ currentTarget }) => {
-                          const email =
-                            currentTarget.form?.elements.namedItem("email");
-                          if (
-                            !(email instanceof HTMLInputElement) ||
-                            !email.reportValidity()
-                          )
-                            return;
-                          setCodeSending(true);
-                          setError("");
-                          setCodeSent(false);
-                          try {
-                            await request("auth/beta-code", {
-                              email: email.value,
-                            });
-                            setCodeSent(true);
-                          } catch (error) {
-                            setError((error as Error).message);
-                          } finally {
-                            setCodeSending(false);
-                          }
-                        }}
-                      >
-                        {codeSending ? "Sending…" : "Send email code"}
-                      </button>
-                    </div>
-                    {codeSent && (
-                      <p role="status">
-                        If this email is approved, a code will arrive shortly.
-                        Wait a few minutes before requesting another.
-                      </p>
-                    )}
-                    <label className="field">
-                      <span>8-digit email code</span>
-                      <input
-                        name="beta_code"
-                        autoComplete="one-time-code"
-                        inputMode="numeric"
-                        pattern="[0-9]{8}"
-                        maxLength={8}
-                        required={mode === "register" || activating}
-                      />
-                    </label>
-                  </>
-                )}
                 <label className="field">
                   <span>Password</span>
                   <input
@@ -592,8 +517,6 @@ function Auth({
                 <button
                   onClick={() => {
                     setMode(mode === "register" ? "login" : "register");
-                    setActivating(false);
-                    setCodeSent(false);
                     setError("");
                   }}
                 >

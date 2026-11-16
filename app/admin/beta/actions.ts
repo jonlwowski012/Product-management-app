@@ -38,6 +38,10 @@ export async function manageApproval(
     const result = await transaction((client) =>
       approveBetaEmail(client, input.data),
     );
+    if (result === "missing")
+      return {
+        error: "Ask the tester to create an account with that email first.",
+      };
     if (result === "existing")
       return { error: "That email is already approved." };
     if (result === "full") return { error: "All beta slots are in use." };

@@ -1,6 +1,5 @@
 import "dotenv/config";
 import pg from "pg";
-import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { readFile, mkdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
@@ -135,43 +134,12 @@ const mock = await mockProvider(3101, async ({ provider, key, model }) => {
   );
 });
 const blob = await mockBlob();
-const betaMail =
-  process.env.BETA_MODE === "true" ? await startBetaMail() : null;
-async function startBetaMail() {
-  const messages = new Map();
-  const server = createServer(async (req, res) => {
-    if (req.method === "POST" && req.url === "/emails") {
-      const chunks = [];
-      for await (const chunk of req) chunks.push(chunk);
-      const message = JSON.parse(Buffer.concat(chunks).toString());
-      const [email] = message.to;
-      if (email.endsWith("@provider-failure.example.test"))
-        return res.writeHead(503).end();
-      messages.set(email, message.text);
-      res.writeHead(200).end();
-    } else {
-      const email = new URL(req.url, "http://127.0.0.1").searchParams.get(
-        "email",
-      );
-      const message = messages.get(email);
-      res.writeHead(message ? 200 : 404).end(message);
-    }
-  });
-  await new Promise((resolve) => server.listen(3105, "127.0.0.1", resolve));
-  return server;
-}
 const env = {
   ...process.env,
   DATABASE_URL: url.toString(),
   DIRECT_DATABASE_URL: url.toString(),
   APP_SECRET: "e2e-only-secret-not-for-real-use-1234567890",
   APP_URL: "http://127.0.0.1:3100",
-  ...(betaMail
-    ? {
-        RESEND_API_KEY: "test-email-key",
-        BETA_EMAIL_FROM: "Evidence <beta@example.test>",
-      }
-    : {}),
   PORT: "3100",
   DATA_DIR: ".local/e2e-data",
   INCLUDED_AI_API_KEY: "e2e-included-key",
@@ -226,7 +194,6 @@ function stop() {
   mock.close();
   void rateClock.end();
   blob.close();
-  betaMail?.close();
   children.forEach((c) => c.kill("SIGTERM"));
 }
 process.on("SIGTERM", stop);
@@ -262,6 +229,7 @@ await fetch("http://127.0.0.1:3100/api/maintenance");
 await fetch("http://127.0.0.1:3100/.well-known/workflow/v1/flow", {
   method: "HEAD",
 });
+const { createServer } = await import("node:http");
 const readiness = createServer((_req, res) => res.end("ready"));
 await new Promise((resolve) => readiness.listen(3103, "127.0.0.1", resolve));
 process.on("SIGTERM", () => readiness.close());

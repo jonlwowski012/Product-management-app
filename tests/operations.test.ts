@@ -99,30 +99,20 @@ test("backup restores a consistent database and verified original files into an 
     } = await source.query("SELECT count(*)::int AS n FROM schema_migrations");
     assert.equal(ledger.n, 21);
     const { rows: approvals } = await source.query(
-      `SELECT i.slot,COALESCE(i.approved_email,u.email) AS approved_email,i.user_id
+      `SELECT i.slot,u.email,i.user_id
        FROM beta_invitations i LEFT JOIN users u ON u.id=i.user_id ORDER BY i.slot`,
     );
     assert.deepEqual(approvals, [
       {
         slot: 1,
-        approved_email: "legacy-beta@example.test",
+        email: "legacy-beta@example.test",
         user_id: oldBetaUser,
       },
-      { slot: 2, approved_email: null, user_id: null },
+      { slot: 2, email: null, user_id: null },
     ]);
     await source.query(
       "INSERT INTO beta_invitations(slot,token_hash) VALUES (3,'old-release-still-writes')",
     );
-    const approvedBetaUser = randomUUID();
-    await source.query(
-      "INSERT INTO users(id,email,name,password_hash) VALUES($1,'new-beta@example.test','New beta','fixture')",
-      [approvedBetaUser],
-    );
-    await source.query(
-      "INSERT INTO beta_invitations(slot,token_hash,user_id,claimed_at,approved_email) VALUES(4,'new-email-only',$1,now(),'new-beta@example.test')",
-      [approvedBetaUser],
-    );
-    await source.query("DELETE FROM users WHERE id=$1", [approvedBetaUser]);
     await source.query("DELETE FROM users WHERE id=$1", [oldBetaUser]);
     assert.deepEqual(
       (

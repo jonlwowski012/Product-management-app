@@ -11,9 +11,8 @@ export default async function BetaAdminPage() {
   if (!isBetaAdmin(user)) notFound();
 
   const approvals = await query<Approval>(
-    `SELECT i.approval_id AS id,COALESCE(i.approved_email,u.email) AS email,i.user_id IS NOT NULL AS active
-     FROM beta_invitations i LEFT JOIN users u ON u.id=i.user_id
-     WHERE i.approved_email IS NOT NULL OR i.user_id IS NOT NULL ORDER BY i.slot`,
+    `SELECT i.approval_id AS id,u.email
+     FROM beta_invitations i JOIN users u ON u.id=i.user_id ORDER BY i.slot`,
   );
 
   return (
