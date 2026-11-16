@@ -108,7 +108,7 @@ export async function assertWritableUser(user: string, client?: pg.PoolClient) {
 }
 export async function assertReadableUser(user: string) {
   const [row] = await query(
-    `SELECT greatest(s.paid_until+interval '30 days',u.beta_export_until)<=now() AS expired
+    `SELECT greatest(s.paid_until+interval '720 hours',u.beta_export_until)<=now() AS expired
      FROM users u JOIN subscriptions s ON s.user_id=u.id WHERE u.id=$1 AND s.paid_until IS NOT NULL
        AND NOT ($2 AND ${betaAccessExists})`,
     [user, betaEnabled()],

@@ -56,8 +56,8 @@ export async function removeBetaApproval(client: Client, approval: string) {
   if (row.user_id)
     await client.query(
       `UPDATE users SET
-         beta_export_until=clock_timestamp()+interval '30 days',
-         cleanup_after=greatest(cleanup_after,clock_timestamp()+interval '30 days')
+         beta_export_until=clock_timestamp()+interval '720 hours',
+         cleanup_after=greatest(cleanup_after,clock_timestamp()+interval '720 hours')
        WHERE id=$1 AND deletion_requested_at IS NULL`,
       [row.user_id],
     );

@@ -185,7 +185,7 @@ export async function expireAccount(user: string) {
       const expired = async () =>
         (
           await c.query(
-            "SELECT paid_until<now()-interval '30 days' AS expired FROM subscriptions WHERE user_id=$1",
+            "SELECT paid_until<now()-interval '720 hours' AS expired FROM subscriptions WHERE user_id=$1",
             [user],
           )
         ).rows[0]?.expired;
@@ -199,7 +199,7 @@ export async function expireAccount(user: string) {
       if (!(await expired())) return false;
     }
     const marked = await c.query(
-      "UPDATE users SET deletion_requested_at=now() WHERE id=$1 AND EXISTS(SELECT 1 FROM subscriptions WHERE user_id=$1 AND paid_until<now()-interval '30 days') RETURNING id",
+      "UPDATE users SET deletion_requested_at=now() WHERE id=$1 AND EXISTS(SELECT 1 FROM subscriptions WHERE user_id=$1 AND paid_until<now()-interval '720 hours') RETURNING id",
       [user],
     );
     return !!marked.rowCount;
@@ -209,7 +209,7 @@ export async function expireAccount(user: string) {
 }
 export async function expireAccounts() {
   const accounts = await query(
-    "UPDATE users SET cleanup_after=now()+interval '15 minutes' WHERE id IN (SELECT u.id FROM users u LEFT JOIN subscriptions s ON s.user_id=u.id WHERE NOT u.is_demo AND u.cleanup_after<=now() AND (u.deletion_requested_at IS NOT NULL OR (s.paid_until<now()-interval '30 days' AND (u.beta_export_until IS NULL OR u.beta_export_until<=now()))) ORDER BY u.cleanup_after,u.id LIMIT 20 FOR UPDATE OF u SKIP LOCKED) RETURNING id",
+    "UPDATE users SET cleanup_after=now()+interval '15 minutes' WHERE id IN (SELECT u.id FROM users u LEFT JOIN subscriptions s ON s.user_id=u.id WHERE NOT u.is_demo AND u.cleanup_after<=now() AND (u.deletion_requested_at IS NOT NULL OR (s.paid_until<now()-interval '720 hours' AND (u.beta_export_until IS NULL OR u.beta_export_until<=now()))) ORDER BY u.cleanup_after,u.id LIMIT 20 FOR UPDATE OF u SKIP LOCKED) RETURNING id",
   );
   let deleted = 0;
   for (const account of accounts) {

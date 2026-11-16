@@ -174,7 +174,7 @@ async function authRoute(req: NextRequest, route: string, demo: boolean) {
     10,
   );
   if (betaRegistration && input.beta_code)
-    await accountRateLimit("beta-verify:" + identity, 8);
+    await accountRateLimit("beta-signup-code:" + identity, 8);
   if (route === "auth/register") {
     try {
       const user = await register(
@@ -201,7 +201,7 @@ async function authRoute(req: NextRequest, route: string, demo: boolean) {
   if (!user || !checkPassword(input.password, user.password_hash))
     throw new AppError("Email or password is incorrect", 401);
   if (betaEnabled() && input.beta_code) {
-    await accountRateLimit("beta-verify:" + identity, 8);
+    await accountRateLimit("beta-activation-code:" + identity, 8);
     await transaction(async (c) => {
       const locked = await c.query(
         "SELECT id FROM users WHERE id=$1 AND password_hash=$2 AND deletion_requested_at IS NULL FOR UPDATE",

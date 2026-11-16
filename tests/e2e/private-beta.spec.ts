@@ -210,6 +210,12 @@ test("admin can approve an existing account and remove its beta access", async (
       ).status(),
     ).toBe(403);
 
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const failed = await page.request.post("/api/auth/register", {
+        data: signup(tester, "00000000"),
+      });
+      expect(failed.status()).toBe(403);
+    }
     await api(page, "auth/beta-code", { email: tester });
     await api(page, "auth/login", {
       email: tester,
