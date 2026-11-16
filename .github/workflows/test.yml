@@ -31,7 +31,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm test
-      - name: Test beta signup and invite administration
+      - name: Test beta signup and manual approval
         env:
           BETA_MODE: "true"
           BETA_ADMIN_USER_ID: ff9fa7c8-ee82-4923-8433-aaef05cdf515

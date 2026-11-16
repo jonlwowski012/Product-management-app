@@ -242,7 +242,9 @@ Vercel plan covers an invited beta for a future paid product before enabling it.
   their research. The new release stops accepting invite links and reuses
   unused slots. Migration 021 preserves previously claimed access and keeps
   the old schema usable during deployment and rollback. After a revocation,
-  use a rollback build that reads `beta_export_until`.
+  use a rollback build that reads `beta_export_until`. The prior app build
+  preserves the data but cannot honor the extended export deadline. If you
+  temporarily republish it, restore a compatible build before that window ends.
 
 ### Transcript security and recovery
 

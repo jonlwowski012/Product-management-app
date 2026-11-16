@@ -45,6 +45,9 @@ test("beta signup creates an account without granting beta access", async ({
     active: false,
     paymentsEnabled: false,
   });
+  await expect(
+    page.getByRole("complementary", { name: "Analysis readiness" }),
+  ).toContainText("Access requires an approved beta email.");
   const write = await page.request.post("/api/sources", {
     data: {
       filename: "Pending.txt",
@@ -120,6 +123,37 @@ test("admin grants beta access to an existing account and removal preserves its 
       (await db.query("SELECT user_id FROM beta_invitations WHERE slot=1"))
         .rows[0].user_id,
     ).toBe(testerId);
+
+    await page.getByLabel("Email address").fill(tester);
+    await page.getByRole("button", { name: "Add email" }).click();
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+      "That email is already approved.",
+    );
+    const waiting = randomUUID() + "@example.com";
+    const fillPrefix = randomUUID() + "-filled-";
+    await db.query(
+      "INSERT INTO users(id,email,name,password_hash) VALUES(gen_random_uuid(),$1,'Waiting','fixture')",
+      [waiting],
+    );
+    await db.query(
+      `WITH filled AS (
+         INSERT INTO users(id,email,name,password_hash)
+         SELECT gen_random_uuid(),$1||n||'@example.com','Fixture','fixture'
+         FROM generate_series(2,10) n RETURNING id,email
+       )
+       UPDATE beta_invitations i SET user_id=filled.id,claimed_at=now()
+       FROM filled WHERE filled.email=$1||i.slot||'@example.com'`,
+      [fillPrefix],
+    );
+    await page.getByLabel("Email address").fill(waiting);
+    await page.getByRole("button", { name: "Add email" }).click();
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+      "All beta slots are in use.",
+    );
+    await db.query("DELETE FROM users WHERE email LIKE $1 OR email=$2", [
+      fillPrefix + "%@example.com",
+      waiting,
+    ]);
 
     await api(page, "auth/login", { email: tester, password });
     expect((await api(page, "flow")).billing).toMatchObject({
