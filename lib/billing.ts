@@ -1,10 +1,15 @@
 import Stripe from "stripe";
 import { betaEnabled } from "./beta-config";
-import { AppError, query, transaction, betaAccessExists } from "./db";
+import {
+  AppError,
+  query,
+  transaction,
+  betaAccessExists,
+  paidExportDeadline,
+} from "./db";
 import type pg from "pg";
 
 export const MONTHLY_PRICE_CENTS = 1000;
-export const READ_ONLY_DAYS = 30;
 export function stripe() {
   if (
     betaEnabled() &&
@@ -52,7 +57,7 @@ export function paidAccess(
 export async function billingStatus(user: string) {
   const [row] = await query(
     `SELECT u.deletion_requested_at,s.status,s.paid_until,s.cancel_at_period_end,
-      s.customer_id IS NOT NULL AS has_customer,u.beta_export_until, ${betaAccessExists} AS beta_approved
+      s.customer_id IS NOT NULL AS has_customer, ${paidExportDeadline} AS read_until, ${betaAccessExists} AS beta_approved
      FROM users u LEFT JOIN subscriptions s ON s.user_id=u.id WHERE u.id=$1`,
     [user],
   );
@@ -67,16 +72,7 @@ export async function billingStatus(user: string) {
     cancelAtPeriodEnd: row?.cancel_at_period_end ?? false,
     hasCustomer: row?.has_customer ?? false,
     readUntil:
-      !beta && row?.paid_until
-        ? new Date(
-            Math.max(
-              new Date(row.paid_until).getTime() + READ_ONLY_DAYS * 86400000,
-              row.beta_export_until
-                ? new Date(row.beta_export_until).getTime()
-                : 0,
-            ),
-          ).toISOString()
-        : null,
+      !beta && row?.paid_until ? new Date(row.read_until).toISOString() : null,
   };
 }
 export async function checkout(user: string) {

@@ -14,6 +14,7 @@ import {
 import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { paidExportDeadline } from "../lib/db";
 import { lockSourceWrite } from "../lib/source-write";
 import { mockBlob } from "../scripts/mock-blob.mjs";
 test("backup restores a consistent database and verified original files into an empty database", async () => {
@@ -136,6 +137,23 @@ test("backup restores a consistent database and verified original files into an 
       ],
     );
     await source.query("TRUNCATE beta_invitations");
+    await source.query("BEGIN");
+    try {
+      await source.query("SET LOCAL TIME ZONE 'America/Chicago'");
+      const {
+        rows: [retention],
+      } = await source.query(
+        `SELECT ${paidExportDeadline} AS deadline
+         FROM (SELECT '2026-03-01 12:00:00-06'::timestamptz AS paid_until) s
+         CROSS JOIN (SELECT NULL::timestamptz AS beta_export_until) u`,
+      );
+      assert.equal(
+        retention.deadline.toISOString(),
+        "2026-03-31T18:00:00.000Z",
+      );
+    } finally {
+      await source.query("ROLLBACK");
+    }
 
     await source.query(
       "INSERT INTO deployment_environment(singleton,name) VALUES(true,'preview')",
