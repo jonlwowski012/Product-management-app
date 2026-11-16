@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { isBetaAdmin } from "../lib/beta-admin";
 import { parseTranscript, verifyQuote } from "../lib/domain";
 import { rollup, optionsValid, Evidence } from "../lib/metrics";
 import { hashPassword, checkPassword, encrypt, decrypt } from "../lib/auth";
@@ -161,4 +162,41 @@ test("simulation demo matches the PDF and every anonymized quote links to its ex
     demoData.result.coverage.skipped_batches,
     demoData.result.analysis_warnings.length,
   );
+});
+
+test("beta admin requires the pinned account and email", () => {
+  const previousMode = process.env.BETA_MODE;
+  const previousAdmin = process.env.BETA_ADMIN_USER_ID;
+  const admin = {
+    id: "ff9fa7c8-ee82-4923-8433-aaef05cdf515",
+    email: "jonathan.lwowski@gmail.com",
+    is_demo: false,
+    deletion_requested_at: null,
+  };
+
+  try {
+    process.env.BETA_MODE = "true";
+    delete process.env.BETA_ADMIN_USER_ID;
+    assert.equal(isBetaAdmin(admin), false);
+    process.env.BETA_ADMIN_USER_ID = admin.id;
+    assert.equal(isBetaAdmin(admin), true);
+    assert.equal(isBetaAdmin({ ...admin, id: "different-account" }), false);
+    assert.equal(
+      isBetaAdmin({ ...admin, email: "different@example.test" }),
+      false,
+    );
+    assert.equal(isBetaAdmin({ ...admin, is_demo: true }), false);
+    assert.equal(
+      isBetaAdmin({ ...admin, deletion_requested_at: new Date() }),
+      false,
+    );
+    assert.equal(isBetaAdmin(null), false);
+    process.env.BETA_MODE = "false";
+    assert.equal(isBetaAdmin(admin), false);
+  } finally {
+    if (previousMode === undefined) delete process.env.BETA_MODE;
+    else process.env.BETA_MODE = previousMode;
+    if (previousAdmin === undefined) delete process.env.BETA_ADMIN_USER_ID;
+    else process.env.BETA_ADMIN_USER_ID = previousAdmin;
+  }
 });
