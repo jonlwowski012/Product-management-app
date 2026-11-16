@@ -4,18 +4,20 @@ import { useActionState, useState } from "react";
 import { BETA_SEATS } from "@/lib/beta-config";
 import { manageInvite } from "./actions";
 
-export function InviteManager({
-  invitations,
-}: {
-  invitations: {
-    slot: number;
-    created_at: string;
-    claimed: boolean;
-    email: string | null;
-  }[];
-}) {
-  const [result, action, pending] = useActionState(manageInvite, {});
+export type Invitation = {
+  slot: number;
+  created_at: string;
+  claimed: boolean;
+  email: string | null;
+};
+
+export function InviteManager({ invitations }: { invitations: Invitation[] }) {
+  const [result, action, pending] = useActionState<
+    Awaited<ReturnType<typeof manageInvite>>,
+    FormData
+  >((_, form) => manageInvite(form), {});
   const [copied, setCopied] = useState<string>();
+  const inviteWithLink = result.invite;
   const available = BETA_SEATS - invitations.length;
 
   return (
@@ -24,19 +26,25 @@ export function InviteManager({
         {available} of {BETA_SEATS} slots available
       </p>
       <div>
-        <button className="button primary" disabled={pending || !available}>
+        <button
+          className="button primary"
+          name="create"
+          value="1"
+          disabled={pending || !available}
+        >
           Create invite
         </button>
       </div>
-      {result.link && (
+      {inviteWithLink && (
         <div className="stack">
           <label htmlFor="beta-invite-link">
-            Copy this one-time link now. You can revoke it later if you lose it.
+            Copy this one-time link now. It belongs to slot{" "}
+            {inviteWithLink.slot}.
           </label>
           <input
             id="beta-invite-link"
             readOnly
-            value={result.link}
+            value={inviteWithLink.link}
             onFocus={(event) => event.target.select()}
           />
           <div>
@@ -45,15 +53,18 @@ export function InviteManager({
               type="button"
               onClick={async () => {
                 try {
-                  await navigator.clipboard.writeText(result.link!);
-                  setCopied(result.link);
+                  await navigator.clipboard.writeText(inviteWithLink.link);
+                  setCopied(inviteWithLink.link);
                 } catch {
                   document.getElementById("beta-invite-link")?.focus();
                 }
               }}
             >
-              {copied === result.link ? "Copied" : "Copy link"}
+              Copy link
             </button>
+            <span role="status">
+              {copied === inviteWithLink.link ? " Link copied." : ""}
+            </span>
           </div>
         </div>
       )}

@@ -231,16 +231,18 @@ Vercel plan covers an invited beta for a future paid product before enabling it.
   `user.id`. Set `BETA_ADMIN_USER_ID` to that ID in the target environment and
   redeploy. Use the ID from your own signed-in session because signup does not
   verify email ownership. If you need a link to create your own account, use
-  the script below. Once configured, open `/admin/beta` to create and copy
-  one-time links, see which slots are claimed, and revoke unused invitations.
-  Copy the link when you create it. The app saves only its hash.
+  the script below. It fills all available slots. Share the remaining links
+  from its output file or revoke unshared links to free their slots. Once
+  configured, open `/admin/beta` to create one-time links, see which slots are
+  claimed, and revoke unused invitations. Copy the link when you create it.
+  The app saves only its hash.
 - After the beta migrations run, set `BETA_MODE=true`, `APP_URL`, and
   `DIRECT_DATABASE_URL` locally for the target environment. Run
   `npx tsx scripts/beta-invitations.ts /absolute/path/to/private-invitations.txt`.
-  Share one link per tester. Each link works once, and the database limits
-  issuance to ten slots per environment. A beta participant uses their own AI
-  provider key. Beta access ends when beta mode is disabled. Participants keep
-  their accounts and can choose whether to subscribe.
+  Share one link per tester. Each link works once. Each environment has ten
+  slots. Revoking an unused link frees its slot. A beta participant uses their
+  own AI provider key. Beta access ends when beta mode is disabled.
+  Participants keep their accounts and can choose whether to subscribe.
 
 ### Transcript security and recovery
 

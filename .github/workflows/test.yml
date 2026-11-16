@@ -31,6 +31,13 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm test
+      - name: Test beta signup and invite administration
+        env:
+          BETA_MODE: "true"
+          BETA_ADMIN_USER_ID: ff9fa7c8-ee82-4923-8433-aaef05cdf515
+          TEST_DATABASE_URL: postgresql://evidence:test-password@127.0.0.1:5432/evidence_beta_e2e
+          PLAYWRIGHT_HTML_OUTPUT_DIR: beta-playwright-report
+        run: npm run test:e2e -- tests/e2e/private-beta.spec.ts --output=beta-test-results
       - run: npm run build
       - run: npm run test:production
       - uses: actions/upload-artifact@v4
@@ -40,4 +47,6 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            beta-playwright-report/
+            beta-test-results/
           retention-days: 14

@@ -117,13 +117,54 @@ test("only the configured account can create and revoke beta invites", async ({
     await api(page, "auth/login", { email, password });
     await page.goto("/admin/beta");
     await expect(page.getByText("10 of 10 slots available")).toBeVisible();
+    await api(page, "auth/logout", {});
+    await page.getByRole("button", { name: "Create invite" }).click();
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+      "Access denied.",
+    );
+    expect((await db.query("SELECT slot FROM beta_invitations")).rowCount).toBe(
+      0,
+    );
+    await api(page, "auth/login", { email, password });
+    await page.goto("/admin/beta");
     await page.getByRole("button", { name: "Create invite" }).click();
     const invite = page.getByLabel(/Copy this one-time link now/);
     await expect(invite).toHaveValue(new RegExp("#invite=[A-Za-z0-9_-]+$"));
+    await page
+      .context()
+      .grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.getByRole("button", { name: "Copy link" }).click();
+    await expect(page.getByRole("main").getByRole("status")).toHaveText(
+      "Link copied.",
+    );
+    expect(
+      await invite.evaluate(
+        async (input: HTMLInputElement) =>
+          (await navigator.clipboard.readText()) === input.value,
+      ),
+    ).toBe(true);
     const token = new URL(await invite.inputValue()).hash.slice(
       "#invite=".length,
     );
     await expect(page.getByText("9 of 10 slots available")).toBeVisible();
+    await api(page, "auth/logout", {});
+    const revokeRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" &&
+        new URL(request.url()).pathname === "/admin/beta",
+    );
+    await page.getByRole("button", { name: "Revoke invite in slot 1" }).click();
+    expect((await revokeRequest).postData()?.includes(token) ?? false).toBe(
+      false,
+    );
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+      "Access denied.",
+    );
+    expect((await db.query("SELECT slot FROM beta_invitations")).rowCount).toBe(
+      1,
+    );
+    await api(page, "auth/login", { email, password });
+    await page.goto("/admin/beta");
     await page.getByRole("button", { name: "Revoke invite in slot 1" }).click();
     await expect(page.getByText("10 of 10 slots available")).toBeVisible();
 
