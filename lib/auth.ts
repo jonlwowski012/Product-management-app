@@ -3,6 +3,7 @@ export { hashPassword, checkPassword, encrypt, decrypt } from "./crypto";
 import { randomBytes, createHash, createHmac } from "node:crypto";
 import { cookies } from "next/headers";
 import { query, transaction, AppError, id } from "./db";
+import { claimBetaEmail } from "./beta-approval";
 import { betaEnabled } from "./beta-config";
 import { DEMO_EMAIL } from "./demo-constants";
 import { AGREEMENT_VERSION, userAgreement } from "./user-agreement";
@@ -114,7 +115,7 @@ export async function register(
   name: string,
   password: string,
   acceptance: { accepted: unknown; version: unknown },
-  invitation?: string,
+  betaCode?: string,
 ) {
   if (acceptance.accepted !== true || acceptance.version !== AGREEMENT_VERSION)
     throw new AppError(
@@ -124,33 +125,13 @@ export async function register(
     throw new AppError("This address is reserved for the public demo", 400);
   const user = id();
   await transaction(async (c) => {
-    if (betaEnabled()) {
-      const {
-        rows: [invite],
-      } = await c.query(
-        "SELECT slot,claimed_at FROM beta_invitations WHERE token_hash=$1 FOR UPDATE",
-        [hash(invitation || "")],
-      );
-      if (!invite || invite.claimed_at)
-        throw new AppError(
-          "This private beta requires an unused invitation link.",
-          403,
-        );
-      await c.query(
-        "UPDATE beta_invitations SET claimed_at=now() WHERE slot=$1",
-        [invite.slot],
-      );
-    }
     await c.query(
       "INSERT INTO users(id,email,name,password_hash) VALUES($1,$2,$3,$4)",
       [user, email.toLowerCase(), name, hashPassword(password)],
     );
     await c.query("INSERT INTO settings(user_id) VALUES($1)", [user]);
     if (betaEnabled())
-      await c.query(
-        "UPDATE beta_invitations SET user_id=$1 WHERE token_hash=$2",
-        [user, hash(invitation || "")],
-      );
+      await claimBetaEmail(c, email.toLowerCase(), user, betaCode);
     await c.query(
       "INSERT INTO audit(id,user_id,action,entity_type,entity_id,detail) VALUES($1,$2,'user_agreement.accepted','user',$2,$3)",
       [id(), user, JSON.stringify(userAgreement())],

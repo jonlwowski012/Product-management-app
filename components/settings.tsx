@@ -173,7 +173,7 @@ export function SettingsPage({
           <p>
             {data.billing.beta
               ? "Your complimentary beta access is active."
-              : "Access requires a beta invitation."}{" "}
+              : "Access requires an approved beta email."}{" "}
             Your AI provider bills usage separately.
           </p>
         </Panel>

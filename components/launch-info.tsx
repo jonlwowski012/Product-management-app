@@ -36,7 +36,7 @@ export function LaunchInfo({
           </p>
           <p>
             {beta ? (
-              "Invited testers get full access. No card required."
+              "Approved testers get full access. No card required."
             ) : (
               <>
                 <strong>$10 USD per month.</strong> One private workspace, one
@@ -77,7 +77,7 @@ export function LaunchInfo({
             </li>
             <li>
               {beta
-                ? "Open your invitation link and create an account."
+                ? "Use your approved email address to sign up."
                 : "Create an account with your email and a strong password."}
             </li>
             <li>
@@ -151,7 +151,8 @@ export function LaunchInfo({
           <p>
             We do not sell your uploaded material or use it to train our own
             models. Operational metrics must exclude source text and secrets.
-            Authentication uses essential session cookies.
+            Authentication uses essential session cookies. For beta access,
+            Resend delivers verification codes to approved email addresses.
           </p>
           <p>
             You can delete a saved transcript from its source view. The

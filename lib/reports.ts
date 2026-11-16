@@ -218,7 +218,7 @@ export async function simpleMetadata(user: string) {
       : !billing.active
         ? billing.paymentsEnabled
           ? "Subscribe for $10/month in Settings to start discovery."
-          : "Access requires a beta invitation."
+          : "Access requires an approved beta email."
         : "Your analysis connection is ready.",
     analysisProvider: settings[0]?.provider || "groq",
     settings: settings[0],

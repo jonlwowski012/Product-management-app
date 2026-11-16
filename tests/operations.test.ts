@@ -70,6 +70,21 @@ test("backup restores a consistent database and verified original files into an 
       preview.stderr,
       /Preview cannot migrate the production database/,
     );
+    const oldBetaUser = randomUUID();
+    await source.query(
+      await readFile(
+        new URL("../lib/private-beta.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    await source.query(
+      "INSERT INTO users(id,email,name,password_hash) VALUES($1,'legacy-beta@example.test','Legacy beta','fixture')",
+      [oldBetaUser],
+    );
+    await source.query(
+      "INSERT INTO beta_invitations(slot,token_hash,user_id,claimed_at) VALUES (1,'claimed-legacy',$1,now()),(2,'pending-legacy',NULL,NULL)",
+      [oldBetaUser],
+    );
     for (let attempt = 0; attempt < 2; attempt++) {
       const migration = spawnSync(
         process.execPath,
@@ -81,7 +96,23 @@ test("backup restores a consistent database and verified original files into an 
     const {
       rows: [ledger],
     } = await source.query("SELECT count(*)::int AS n FROM schema_migrations");
-    assert.equal(ledger.n, 20);
+    assert.equal(ledger.n, 21);
+    const { rows: approvals } = await source.query(
+      "SELECT slot,approved_email,user_id FROM beta_invitations ORDER BY slot",
+    );
+    assert.deepEqual(approvals, [
+      {
+        slot: 1,
+        approved_email: "legacy-beta@example.test",
+        user_id: oldBetaUser,
+      },
+    ]);
+    await source.query("DELETE FROM users WHERE id=$1", [oldBetaUser]);
+    assert.equal(
+      (await source.query("SELECT slot FROM beta_invitations")).rowCount,
+      0,
+    );
+
     await source.query(
       "INSERT INTO deployment_environment(singleton,name) VALUES(true,'preview')",
     );

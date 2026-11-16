@@ -2,7 +2,7 @@
 
 A private, user-owned discovery app with one default workflow: **upload transcripts → find opportunities → get a next step**. Paste notes or upload transcripts, PDFs, DOCX documents, and PPTX slides. Evidence produces up to three problem-oriented opportunities, with supporting passages, direct challenges, separate risks and context, uncertainty, and a practical validation step. Choose an opportunity, track your validation, and record what you learned. CRM is outside this release.
 
-Apply migrations through **020** with `npm run db:migrate` before running this version. Existing reports, sources, reviewed fields, recovery snapshots, and human validation work are retained.
+Apply migrations through **021** with `npm run db:migrate` before running this version. Existing reports, sources, reviewed fields, recovery snapshots, and human validation work are retained.
 
 ## Simple discovery workflow
 
@@ -26,7 +26,7 @@ The workspace has three focused views: **Discovery**, **Customers**, and **Signa
 
 Automated checks use synthetic notes and a local provider double. They cover separate challenge/risk categories, source ownership, partial recovery with checkpoint reuse, concurrent recovery requests and attempt limits, retained edits and learning, allowance checks, exports, backup/restore, read-only demo boundaries, and mobile layouts. They do not establish real model quality or first-time-user comprehension.
 
-Before promoting this change, run one controlled analysis in a dedicated synthetic account using an approved live provider connection. Include an explicit customer disagreement, an operational constraint, and internal strategy; inspect the original quotes, category explanations, coverage, and saved learning. Record the provider/model and result without storing its key. Apply migrations through 020 before the application release, then verify Preview before Production.
+Before promoting this change, run one controlled analysis in a dedicated synthetic account using an approved live provider connection. Include an explicit customer disagreement, an operational constraint, and internal strategy; inspect the original quotes, category explanations, coverage, and saved learning. Record the provider/model and result without storing its key. Apply migrations through 021 before the application release, then verify Preview before Production.
 
 Run five individual first-use sessions without coaching. Use the fictional interviews and internal notes in `tests/fixtures/discovery-acceptance/`. Ask each person to explain what Evidence does, upload the supplied synthetic transcripts, find a problem and its next step, open its source evidence, explain a disagreement versus a risk, choose an opportunity, record an inconclusive result, and find that learning after adding material. Include a partial-analysis recovery task. Record completion, time to first useful result, misunderstandings, and assistance needed. Release only when all five recognize partial coverage and retain their learning, and at least four complete the core journey unaided. Fix and retest any misleading evidence interpretation or blocked task. These human checks remain pending until performed by real participants.
 
@@ -52,7 +52,7 @@ Evidence has one plan: **$10 USD/month**, one owner and private workspace, all c
 
 Netlify is the primary deployment target. `netlify.toml` sets Node 22, private Netlify storage, Async Workloads, and separate Production/Preview environment bindings. Build and publish with the Netlify CLI as described below; the obsolete Vercel deployment workflow has been removed.
 
-Apply migrations through **020** with `npm run db:migrate` before deploying. They preserve existing data, add subscription/account records and deletion/concurrency safeguards, and enforce 1 GB of originals, 25 million extracted text characters per workspace, and one active analysis per owner. Legacy original sizes are estimated from stored pages until exact sizes are available. There are no automatic overage charges. Existing accounts are never charged automatically.
+Apply migrations through **021** with `npm run db:migrate` before deploying. They preserve existing data, add subscription/account records and deletion/concurrency safeguards, and enforce 1 GB of originals, 25 million extracted text characters per workspace, and one active analysis per owner. Legacy original sizes are estimated from stored pages until exact sizes are available. There are no automatic overage charges. Existing accounts are never charged automatically.
 
 Stripe Checkout and the customer portal manage subscriptions. Configure `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` (an active USD 1,000-cent monthly recurring price), `STRIPE_PORTAL_CONFIGURATION_ID` (the Evidence-specific cancellation configuration), and `STRIPE_WEBHOOK_SECRET` independently for Preview/sandbox and Production/live mode. Register `/api/billing/webhook` for `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, and `invoice.payment_failed`. Signature validation is required; the webhook is outside browser-session/CSRF authentication. Retries are idempotent; subscription state is fetched under a database lock rather than trusting event delivery order. Only settled invoice periods grant access, including zero-dollar invoices after a 100% discount. Checkout accepts Stripe promotion codes; older open sessions are replaced so the code field is available. Refresh payment status in Settings reconciles a delayed webhook. Configure the Stripe portal to permit cancellation at the end of the paid period, payment method changes, and invoice downloads.
 
@@ -202,7 +202,7 @@ Use Node 22 for all commands. `npm run test:ops` includes commercial boundaries 
 
 `npm run health` reads authenticated health counters and fails for stuck processing jobs, recent failed analyses, repeated storage cleanup failures, or past-due accounts. Workflow failures are the operator alert. Never include source content, passwords, keys, or raw provider error bodies in monitoring. Monitor Netlify credits and Neon usage before committing publicly to the capacity limits. Netlify remains on Free with automatic top-ups disabled; credit exhaustion pauses the app. No paid hosting upgrade has been made.
 
-Pending real-world gates: a hosted restore drill, an actual live card payment with a Stripe-delivered paid-invoice webhook, five uncoached human sessions using `tests/fixtures/discovery-acceptance/`, reviewed business/policy details, and a five-customer paid pilot. Automated synthetic checks cannot stand in for those sessions. Keep production sales closed until the applicable gates are completed. Email features and a custom domain remain explicitly deferred.
+Pending real-world gates: a hosted restore drill, an actual live card payment with a Stripe-delivered paid-invoice webhook, five uncoached human sessions using `tests/fixtures/discovery-acceptance/`, reviewed business/policy details, and a five-customer paid pilot. Automated synthetic checks cannot stand in for those sessions. Keep production sales closed until the applicable gates are completed.
 
 ### Private beta on Vercel
 
@@ -226,23 +226,21 @@ Vercel plan covers an invited beta for a future paid product before enabling it.
   Vercel Blob credentials. Rehearse this on staging before stopping writes to
   take the final production snapshot. Keep the source and target backups and
   update the operations URL after validating the new deployment.
-- To open the invitation manager, sign in as `jonathan.lwowski@gmail.com` on the
-  target environment and open `/api/auth` to find your signed-in account's
-  `user.id`. Set `BETA_ADMIN_USER_ID` to that ID in the target environment and
-  redeploy. Use the ID from your own signed-in session because signup does not
-  verify email ownership. If you need a link to create your own account, use
-  the script below. It fills all available slots. Share the remaining links
-  from its output file or revoke unshared links to free their slots. Once
-  configured, open `/admin/beta` to create one-time links, see which slots are
-  claimed, and revoke unused invitations. Copy the link when you create it.
-  The app saves only its hash.
-- After the beta migrations run, set `BETA_MODE=true`, `APP_URL`, and
-  `DIRECT_DATABASE_URL` locally for the target environment. Run
-  `npx tsx scripts/beta-invitations.ts /absolute/path/to/private-invitations.txt`.
-  Share one link per tester. Each link works once. Each environment has ten
-  slots. Revoking an unused link frees its slot. A beta participant uses their
-  own AI provider key. Beta access ends when beta mode is disabled.
-  Participants keep their accounts and can choose whether to subscribe.
+- Configure `RESEND_API_KEY` with a sending-only Resend key and
+  `BETA_EMAIL_FROM` with a sender on a verified domain in the target
+  environment. Beta signups and first-time activation require an emailed
+  eight-digit code. Use a separate sending key for staging.
+- Sign in as `jonathan.lwowski@gmail.com` on the target environment and open
+  `/api/auth` to find your signed-in account's `user.id`. Set
+  `BETA_ADMIN_USER_ID` to that ID and redeploy. If an admin account needs to
+  be created first, set `DIRECT_DATABASE_URL` to the target environment and run
+  `npx tsx scripts/beta-approve.ts jonathan.lwowski@gmail.com`, then sign up
+  with the emailed code.
+- Open `/admin/beta` to add and remove approved emails. Testers visit the normal
+  homepage. Existing account owners can use **Activate beta access** on the
+  sign-in form. Each environment has ten slots. Removing someone frees their
+  slot and removes beta access while preserving their account and research.
+  Migration 021 preserves previously claimed access and retires unused links.
 
 ### Transcript security and recovery
 
