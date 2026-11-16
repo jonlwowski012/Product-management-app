@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -56,4 +57,39 @@ test("builds derive the direct Neon connection without changing runtime configur
       }),
     /pooled Neon/,
   );
+});
+
+test("beta deployment preflight requires email delivery settings before migration", () => {
+  const env = {
+    ...process.env,
+    DEPLOY_ENV: "preview",
+    BETA_MODE: "true",
+    RESEND_API_KEY: "",
+    BETA_EMAIL_FROM: "",
+  };
+  for (const name of [
+    "DATABASE_URL",
+    "DIRECT_DATABASE_URL",
+    "APP_SECRET",
+    "APP_URL",
+    "CRON_SECRET",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_PRICE_ID",
+    "STRIPE_PORTAL_CONFIGURATION_ID",
+    "STRIPE_WEBHOOK_SECRET",
+  ])
+    env[name] = "not-used-by-preflight-regression-test";
+  for (const name of ["RESEND_API_KEY", "BETA_EMAIL_FROM"]) {
+    const result = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "scripts/deploy-check.ts", "--before-migrate"],
+      { env, encoding: "utf8" },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(
+      result.stderr,
+      new RegExp("Missing beta deployment variable: " + name),
+    );
+    env[name] = "synthetic-setting";
+  }
 });

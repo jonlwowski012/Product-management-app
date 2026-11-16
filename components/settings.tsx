@@ -106,6 +106,13 @@ export function SettingsPage({
         </Form>
       </section>
     );
+  const exportDeadline = !data.billing?.active && data.billing?.readUntil && (
+    <p>
+      Read and export your saved work until{" "}
+      {new Date(data.billing.readUntil).toLocaleDateString()}. It is scheduled
+      for deletion afterward.
+    </p>
+  );
   return (
     <section className="flow-settings stack">
       <AppLink href="/" className="text-link">
@@ -176,6 +183,7 @@ export function SettingsPage({
               : "Access requires an approved beta email."}{" "}
             Your AI provider bills usage separately.
           </p>
+          {exportDeadline}
         </Panel>
       )}
       {!data.user.is_demo && data.billing?.paymentsEnabled !== false && (
@@ -202,13 +210,7 @@ export function SettingsPage({
                 : ""}
             </p>
           )}
-          {!data.billing?.active && data.billing?.readUntil && (
-            <p>
-              Read and export your saved work until{" "}
-              {new Date(data.billing.readUntil).toLocaleDateString()}; it is
-              scheduled for deletion afterward.
-            </p>
-          )}
+          {exportDeadline}
           <Form
             onSubmit={async () => {
               const result = await request(

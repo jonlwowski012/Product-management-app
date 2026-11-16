@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { betaEnabled } from "./beta-config";
-import { AppError, query, transaction, betaAccess } from "./db";
+import { AppError, query, transaction, betaAccessExists } from "./db";
 import type pg from "pg";
 
 export const MONTHLY_PRICE_CENTS = 1000;
@@ -51,10 +51,13 @@ export function paidAccess(
 }
 export async function billingStatus(user: string) {
   const [row] = await query(
-    "SELECT u.deletion_requested_at,s.status,s.paid_until,s.cancel_at_period_end,s.customer_id IS NOT NULL AS has_customer FROM users u LEFT JOIN subscriptions s ON s.user_id=u.id WHERE u.id=$1",
+    `SELECT u.deletion_requested_at,s.status,s.paid_until,s.cancel_at_period_end,
+      s.customer_id IS NOT NULL AS has_customer,u.beta_export_until, ${betaAccessExists} AS beta_approved
+     FROM users u LEFT JOIN subscriptions s ON s.user_id=u.id WHERE u.id=$1`,
     [user],
   );
-  const beta = !row?.deletion_requested_at && (await betaAccess(user));
+  const beta =
+    betaEnabled() && !!row?.beta_approved && !row.deletion_requested_at;
   return {
     beta,
     paymentsEnabled: !betaEnabled(),
@@ -66,7 +69,12 @@ export async function billingStatus(user: string) {
     readUntil:
       !beta && row?.paid_until
         ? new Date(
-            new Date(row.paid_until).getTime() + READ_ONLY_DAYS * 86400000,
+            Math.max(
+              new Date(row.paid_until).getTime() + READ_ONLY_DAYS * 86400000,
+              row.beta_export_until
+                ? new Date(row.beta_export_until).getTime()
+                : 0,
+            ),
           ).toISOString()
         : null,
   };

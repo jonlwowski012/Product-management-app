@@ -512,6 +512,7 @@ function Auth({
                     {codeSent && (
                       <p role="status">
                         If this email is approved, a code will arrive shortly.
+                        Wait a few minutes before requesting another.
                       </p>
                     )}
                     <label className="field">

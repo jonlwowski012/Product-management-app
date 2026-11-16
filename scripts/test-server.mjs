@@ -145,6 +145,8 @@ async function startBetaMail() {
       for await (const chunk of req) chunks.push(chunk);
       const message = JSON.parse(Buffer.concat(chunks).toString());
       const [email] = message.to;
+      if (email.endsWith("@provider-failure.example.test"))
+        return res.writeHead(503).end();
       messages.set(email, message.text);
       res.writeHead(200).end();
     } else {

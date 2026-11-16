@@ -98,7 +98,8 @@ test("backup restores a consistent database and verified original files into an 
     } = await source.query("SELECT count(*)::int AS n FROM schema_migrations");
     assert.equal(ledger.n, 21);
     const { rows: approvals } = await source.query(
-      "SELECT slot,approved_email,user_id FROM beta_invitations ORDER BY slot",
+      `SELECT i.slot,COALESCE(i.approved_email,u.email) AS approved_email,i.user_id
+       FROM beta_invitations i LEFT JOIN users u ON u.id=i.user_id ORDER BY i.slot`,
     );
     assert.deepEqual(approvals, [
       {
@@ -106,12 +107,35 @@ test("backup restores a consistent database and verified original files into an 
         approved_email: "legacy-beta@example.test",
         user_id: oldBetaUser,
       },
+      { slot: 2, approved_email: null, user_id: null },
     ]);
-    await source.query("DELETE FROM users WHERE id=$1", [oldBetaUser]);
-    assert.equal(
-      (await source.query("SELECT slot FROM beta_invitations")).rowCount,
-      0,
+    await source.query(
+      "INSERT INTO beta_invitations(slot,token_hash) VALUES (3,'old-release-still-writes')",
     );
+    const approvedBetaUser = randomUUID();
+    await source.query(
+      "INSERT INTO users(id,email,name,password_hash) VALUES($1,'new-beta@example.test','New beta','fixture')",
+      [approvedBetaUser],
+    );
+    await source.query(
+      "INSERT INTO beta_invitations(slot,token_hash,user_id,claimed_at,approved_email) VALUES(4,'new-email-only',$1,now(),'new-beta@example.test')",
+      [approvedBetaUser],
+    );
+    await source.query("DELETE FROM users WHERE id=$1", [approvedBetaUser]);
+    await source.query("DELETE FROM users WHERE id=$1", [oldBetaUser]);
+    assert.deepEqual(
+      (
+        await source.query(
+          "SELECT slot,token_hash FROM beta_invitations ORDER BY slot",
+        )
+      ).rows,
+      [
+        { slot: 1, token_hash: "claimed-legacy" },
+        { slot: 2, token_hash: "pending-legacy" },
+        { slot: 3, token_hash: "old-release-still-writes" },
+      ],
+    );
+    await source.query("TRUNCATE beta_invitations");
 
     await source.query(
       "INSERT INTO deployment_environment(singleton,name) VALUES(true,'preview')",

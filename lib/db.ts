@@ -79,10 +79,12 @@ export async function assertPersonalUser(user: string, client?: pg.PoolClient) {
   if (!row || row.is_demo || row.deletion_requested_at)
     throw new AppError("The demo workspace is read only", 403);
 }
+export const betaAccessExists =
+  "EXISTS(SELECT 1 FROM beta_invitations WHERE user_id=$1 AND claimed_at IS NOT NULL)";
+
 export async function betaAccess(user: string, client?: pg.PoolClient) {
   if (!betaEnabled()) return false;
-  const sql =
-    "SELECT 1 FROM beta_invitations WHERE user_id=$1 AND claimed_at IS NOT NULL";
+  const sql = `SELECT 1 WHERE ${betaAccessExists}`;
   const rows = client
     ? (await client.query(sql, [user])).rows
     : await query(sql, [user]);
@@ -98,20 +100,20 @@ export async function assertWritableUser(user: string, client?: pg.PoolClient) {
     : await query(sql, [user]);
   if (!row.paid_until || new Date(row.paid_until).getTime() <= Date.now())
     throw new AppError(
-      "Subscribe for $10/month in Settings to upload or analyze material. Your saved work remains available for export during the retention period.",
+      betaEnabled()
+        ? "Access requires an approved beta email."
+        : "Subscribe for $10/month in Settings to upload or analyze material. Your saved work remains available for export during the retention period.",
       402,
     );
 }
 export async function assertReadableUser(user: string) {
-  if (await betaAccess(user)) return;
   const [row] = await query(
-    "SELECT paid_until FROM subscriptions WHERE user_id=$1",
-    [user],
+    `SELECT greatest(s.paid_until+interval '30 days',u.beta_export_until)<=now() AS expired
+     FROM users u JOIN subscriptions s ON s.user_id=u.id WHERE u.id=$1 AND s.paid_until IS NOT NULL
+       AND NOT ($2 AND ${betaAccessExists})`,
+    [user, betaEnabled()],
   );
-  if (
-    row?.paid_until &&
-    new Date(row.paid_until).getTime() + 30 * 86400000 <= Date.now()
-  )
+  if (row?.expired)
     throw new AppError(
       "Your export period has ended and this workspace is scheduled for deletion.",
       410,

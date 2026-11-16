@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { currentUser } from "@/lib/auth";
 import { isBetaAdmin } from "@/lib/beta-admin";
-import { approveBetaEmail } from "@/lib/beta-approval";
-import { query, transaction } from "@/lib/db";
+import { approveBetaEmail, removeBetaApproval } from "@/lib/beta-approval";
+import { transaction } from "@/lib/db";
 
 type ActionResult = { message?: string; error?: string };
 
@@ -19,14 +19,13 @@ export async function manageApproval(
     const remove = form.get("remove");
     if (remove !== null) {
       const id = z.uuid().parse(remove);
-      const removed = await query(
-        "DELETE FROM beta_invitations WHERE approval_id=$1 RETURNING slot",
-        [id],
+      const removed = await transaction((client) =>
+        removeBetaApproval(client, id),
       );
       revalidatePath("/admin/beta");
-      return removed.length
+      return removed
         ? { message: "Email removed from the beta list." }
-        : { error: "That email has already been removed." };
+        : { error: "That approval changed. Review the list and try again." };
     }
     if (form.get("add") !== "1") return { error: "Choose a beta list action." };
     const input = z

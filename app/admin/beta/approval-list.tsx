@@ -54,7 +54,6 @@ export function ApprovalList({ approvals }: { approvals: Approval[] }) {
                   aria-label={`Remove ${approval.email}`}
                   onClick={(event) => {
                     if (
-                      approval.active &&
                       !window.confirm(
                         `Remove beta access for ${approval.email}?`,
                       )
