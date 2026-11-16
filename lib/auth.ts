@@ -12,7 +12,13 @@ const sessionCookie = (demo: boolean) =>
 export async function currentUser(demo = false) {
   const token = (await cookies()).get(sessionCookie(demo))?.value;
   if (!token) return null;
-  const [u] = await query(
+  const [u] = await query<{
+    id: string;
+    email: string;
+    name: string;
+    is_demo: boolean;
+    deletion_requested_at: Date | null;
+  }>(
     "SELECT u.id,u.email,u.name,u.is_demo,u.deletion_requested_at FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.is_demo=$2",
     [hash(token), demo],
   );
