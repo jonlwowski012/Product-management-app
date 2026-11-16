@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AGREEMENT_VERSION } from "@/lib/user-agreement";
 import {
   Layers3,
@@ -35,17 +35,6 @@ function Auth({
   const [mode, setMode] = useState<"login" | "register">("register"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  const [invitation, setInvitation] = useState("");
-  useEffect(() => {
-    if (!beta) return;
-    const token = new URLSearchParams(window.location.hash.slice(1)).get(
-      "invite",
-    );
-    if (token) {
-      setInvitation(token);
-      document.getElementById("get-started")?.scrollIntoView();
-    }
-  }, [beta]);
   return (
     <div className="marketing-home">
       <header className="home-nav">
@@ -97,7 +86,7 @@ function Auth({
             </a>
             <p className="home-price-note">
               {beta
-                ? "Free private beta · Invitation required"
+                ? "Free private beta · Admin approval required"
                 : "$10/month · All features · Bring your own AI API key"}
               <br />
               AI usage billed separately by your provider.
@@ -349,7 +338,7 @@ function Auth({
             </h2>
             <p className="home-plan-price">
               {beta ? (
-                "Free for invited testers"
+                "Free for approved testers"
               ) : (
                 <>
                   $10 <span>USD / month</span>
@@ -411,7 +400,7 @@ function Auth({
               <p>
                 {mode === "register"
                   ? beta
-                    ? "Open your invitation link to create a free beta workspace."
+                    ? "Create an account, then ask the beta admin to approve your signup."
                     : "Create an account, connect your AI API key, and subscribe when you’re ready to work with your own transcripts."
                   : "Sign in to your evidence workspace."}
               </p>
@@ -428,7 +417,6 @@ function Auth({
                         ? {
                             agreement_accepted: form.has("agreement"),
                             agreement_version: AGREEMENT_VERSION,
-                            ...(beta ? { invitation } : {}),
                           }
                         : {}),
                       email: form.get("email"),

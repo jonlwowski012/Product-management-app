@@ -134,7 +134,6 @@ async function authRoute(req: NextRequest, route: string, demo: boolean) {
       name: text(80).optional(),
       agreement_accepted: z.unknown().optional(),
       agreement_version: z.unknown().optional(),
-      invitation: z.string().max(128).optional(),
     })
     .parse(await body(req));
   const identity = input.email.toLowerCase();
@@ -149,7 +148,6 @@ async function authRoute(req: NextRequest, route: string, demo: boolean) {
           accepted: input.agreement_accepted,
           version: input.agreement_version,
         },
-        input.invitation,
       );
       return { id: user };
     } catch (e) {

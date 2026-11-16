@@ -1,199 +1,214 @@
 import { test, expect } from "@playwright/test";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { hashPassword } from "../../lib/crypto";
 import { AGREEMENT_VERSION } from "../../lib/user-agreement";
 import { api, testDatabase } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
-
 test.skip(
   process.env.BETA_MODE !== "true",
   "Run against the isolated beta configuration",
 );
 
-test("an invitation grants one tester access without a subscription or checkout", async ({
-  page,
-}) => {
-  const token = randomBytes(32).toString("base64url");
-  await page.goto("/");
-  const db = testDatabase();
-  await db.connect();
-  try {
-    await db.query("TRUNCATE beta_invitations");
-    await db.query(
-      "INSERT INTO beta_invitations(slot,token_hash) VALUES(1,$1)",
-      [createHash("sha256").update(token).digest("hex")],
-    );
-    const input = {
-      email: randomUUID() + "@example.com",
-      password: "beta-test-password-123",
-      agreement_accepted: true,
-      agreement_version: AGREEMENT_VERSION,
-    };
-    const register = (invitation?: string) =>
-      page.request.post("/api/auth/register", {
-        data: { ...input, email: randomUUID() + "@example.com", invitation },
-      });
-    expect((await register()).status()).toBe(403);
-    await page.goto("/#invite=" + token);
-    await page.reload();
-    await page.getByLabel("Your name").fill("Beta Tester");
-    await page.getByLabel("Email address").fill(input.email);
-    await page.getByLabel("Password", { exact: true }).fill(input.password);
-    await page
-      .getByRole("checkbox", { name: /I agree to the User Agreement/ })
-      .check();
-    await page
-      .getByRole("button", { name: "Create account", exact: true })
-      .click();
-    await expect(
-      page.getByRole("heading", {
-        name: "Turn customer conversations into product opportunities.",
-      }),
-    ).toBeVisible();
-    expect((await api(page, "flow")).billing).toMatchObject({
-      active: true,
-      beta: true,
-      paymentsEnabled: false,
-      paidUntil: null,
-    });
-    const imported = await api(page, "sources", {
-      filename: "Beta feedback.txt",
-      content: "We need audit logs before we can buy.",
-    });
-    expect(imported.sources).toHaveLength(1);
-    expect((await register(token)).status()).toBe(403);
-    for (const path of ["checkout", "portal"]) {
-      expect(
-        (
-          await page.request.post("/api/billing/" + path, { data: {} })
-        ).status(),
-      ).toBe(403);
-    }
-    await page.goto("/settings");
-    await expect(
-      page.getByText("Your complimentary beta access is active.", {
-        exact: false,
-      }),
-    ).toBeVisible();
-    await expect(page.getByRole("button", { name: /subscribe/i })).toHaveCount(
-      0,
-    );
-    await expect(
-      db.query(
-        "INSERT INTO beta_invitations(slot,token_hash) VALUES(11,'invalid')",
-      ),
-    ).rejects.toThrow();
-  } finally {
-    await db.end();
-  }
+const password = "isolated-beta-password";
+const signup = (email: string) => ({
+  email,
+  password,
+  agreement_accepted: true,
+  agreement_version: AGREEMENT_VERSION,
 });
 
-test("only the configured account can create and revoke beta invites", async ({
+test("beta signup creates an account without granting beta access", async ({
   page,
-  browser,
+}) => {
+  const email = randomUUID() + "@example.com";
+  await page.goto("/");
+  await expect(
+    page.getByText(
+      "Create an account, then ask the beta admin to approve your signup.",
+    ),
+  ).toBeVisible();
+  await page.getByLabel("Your name").fill("Beta applicant");
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page
+    .getByRole("checkbox", { name: /I agree to the User Agreement/ })
+    .check();
+  await page
+    .getByRole("button", { name: "Create account", exact: true })
+    .click();
+  await expect
+    .poll(async () => (await api(page, "auth")).user?.email)
+    .toBe(email);
+  expect((await api(page, "flow")).billing).toMatchObject({
+    beta: false,
+    active: false,
+    paymentsEnabled: false,
+  });
+  await expect(
+    page.getByRole("complementary", { name: "Analysis readiness" }),
+  ).toContainText("Access requires an approved beta email.");
+  const write = await page.request.post("/api/sources", {
+    data: {
+      filename: "Pending.txt",
+      content: "This workspace has not been approved.",
+    },
+  });
+  expect(write.status()).toBe(402);
+  expect(await write.json()).toMatchObject({
+    error: "Access requires an approved beta email.",
+  });
+  expect(
+    (await page.request.post("/api/billing/checkout", { data: {} })).status(),
+  ).toBe(403);
+});
+
+test("admin grants beta access to an existing account and removal preserves its export window", async ({
+  page,
 }) => {
   const adminId = process.env.BETA_ADMIN_USER_ID;
   test.skip(!adminId, "Run with an isolated beta admin configuration");
   const db = testDatabase();
   await db.connect();
-  const password = "isolated-beta-admin-password";
-  const email = "jonathan.lwowski@gmail.com";
+  const admin = "jonathan.lwowski@gmail.com";
+  const tester = randomUUID() + "@example.com";
+
   try {
     await db.query("TRUNCATE beta_invitations");
-    await db.query("DELETE FROM users WHERE email=$1", [email]);
+    await db.query("DELETE FROM users WHERE email=$1", [admin]);
     await db.query(
       "INSERT INTO users(id,email,name,password_hash) VALUES($1,$2,'Beta administrator',$3)",
-      [adminId, email, hashPassword(password)],
+      [adminId, admin, hashPassword(password)],
     );
-    const visitor = await browser.newContext();
-    try {
-      const viewer = await visitor.newPage();
-      await viewer.goto("/admin/beta");
-      await expect(viewer).toHaveURL("/");
-    } finally {
-      await visitor.close();
-    }
-    await api(page, "auth/login", { email, password });
+    await api(page, "auth/login", { email: admin, password });
     await page.goto("/admin/beta");
-    await expect(page.getByText("10 of 10 slots available")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Beta access" }),
+    ).toBeVisible();
+    await page.getByLabel("Email address").fill(tester);
+    await page.getByRole("button", { name: "Add email" }).click();
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+      "Ask the tester to create an account with that email first.",
+    );
+    await page.getByLabel("Email address").fill(tester);
     await api(page, "auth/logout", {});
-    await page.getByRole("button", { name: "Create invite" }).click();
+    await page.getByRole("button", { name: "Add email" }).click();
     await expect(page.getByRole("main").getByRole("alert")).toHaveText(
       "Access denied.",
     );
     expect((await db.query("SELECT slot FROM beta_invitations")).rowCount).toBe(
       0,
     );
-    await api(page, "auth/login", { email, password });
+
+    const account = await api(page, "auth/register", signup(tester));
+    const testerId = account.id;
+    expect((await page.goto("/admin/beta"))?.status()).toBe(404);
+    await db.query(
+      "INSERT INTO subscriptions(user_id,status,paid_until) VALUES($1,'canceled',now()-interval '45 days')",
+      [testerId],
+    );
+    await db.query(
+      "INSERT INTO beta_invitations(slot,token_hash) SELECT n,'old-link-'||n FROM generate_series(1,10) n",
+    );
+
+    await api(page, "auth/login", { email: admin, password });
     await page.goto("/admin/beta");
-    await page.getByRole("button", { name: "Create invite" }).click();
-    const invite = page.getByLabel(/Copy this one-time link now/);
-    await expect(invite).toHaveValue(new RegExp("#invite=[A-Za-z0-9_-]+$"));
-    await page
-      .context()
-      .grantPermissions(["clipboard-read", "clipboard-write"]);
-    await page.getByRole("button", { name: "Copy link" }).click();
-    await expect(page.getByRole("main").getByRole("status")).toHaveText(
-      "Link copied.",
-    );
-    expect(
-      await invite.evaluate(
-        async (input: HTMLInputElement) =>
-          (await navigator.clipboard.readText()) === input.value,
-      ),
-    ).toBe(true);
-    const token = new URL(await invite.inputValue()).hash.slice(
-      "#invite=".length,
-    );
+    await page.getByLabel("Email address").fill(tester.toUpperCase());
+    await page.getByRole("button", { name: "Add email" }).click();
+    await expect(
+      page.getByRole("list", { name: "Approved beta emails" }),
+    ).toContainText(tester);
     await expect(page.getByText("9 of 10 slots available")).toBeVisible();
-    await api(page, "auth/logout", {});
-    const revokeRequest = page.waitForRequest(
-      (request) =>
-        request.method() === "POST" &&
-        new URL(request.url()).pathname === "/admin/beta",
-    );
-    await page.getByRole("button", { name: "Revoke invite in slot 1" }).click();
-    expect((await revokeRequest).postData()?.includes(token) ?? false).toBe(
-      false,
-    );
+    expect(
+      (await db.query("SELECT user_id FROM beta_invitations WHERE slot=1"))
+        .rows[0].user_id,
+    ).toBe(testerId);
+
+    await page.getByLabel("Email address").fill(tester);
+    await page.getByRole("button", { name: "Add email" }).click();
     await expect(page.getByRole("main").getByRole("alert")).toHaveText(
-      "Access denied.",
+      "That email is already approved.",
     );
-    expect((await db.query("SELECT slot FROM beta_invitations")).rowCount).toBe(
-      1,
+    const waiting = randomUUID() + "@example.com";
+    const fillPrefix = randomUUID() + "-filled-";
+    await db.query(
+      "INSERT INTO users(id,email,name,password_hash) VALUES(gen_random_uuid(),$1,'Waiting','fixture')",
+      [waiting],
     );
-    await api(page, "auth/login", { email, password });
+    await db.query(
+      `WITH filled AS (
+         INSERT INTO users(id,email,name,password_hash)
+         SELECT gen_random_uuid(),$1||n||'@example.com','Fixture','fixture'
+         FROM generate_series(2,10) n RETURNING id,email
+       )
+       UPDATE beta_invitations i SET user_id=filled.id,claimed_at=now()
+       FROM filled WHERE filled.email=$1||i.slot||'@example.com'`,
+      [fillPrefix],
+    );
+    await page.getByLabel("Email address").fill(waiting);
+    await page.getByRole("button", { name: "Add email" }).click();
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+      "All beta slots are in use.",
+    );
+    await db.query("DELETE FROM users WHERE email LIKE $1 OR email=$2", [
+      fillPrefix + "%@example.com",
+      waiting,
+    ]);
+
+    await api(page, "auth/login", { email: tester, password });
+    expect((await api(page, "flow")).billing).toMatchObject({
+      active: true,
+      beta: true,
+      paymentsEnabled: false,
+    });
+    expect(
+      (
+        await api(page, "sources", {
+          filename: "Test feedback.txt",
+          content: "We need searchable audit trails.",
+        })
+      ).sources,
+    ).toHaveLength(1);
+
+    await api(page, "auth/login", { email: admin, password });
     await page.goto("/admin/beta");
-    await page.getByRole("button", { name: "Revoke invite in slot 1" }).click();
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await page.getByRole("button", { name: "Remove " + tester }).click();
+    await expect(
+      page.getByRole("list", { name: "Approved beta emails" }),
+    ).toContainText(tester);
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Remove " + tester }).click();
     await expect(page.getByText("10 of 10 slots available")).toBeVisible();
 
-    const signup = (invitation: string) =>
-      page.request.post("/api/auth/register", {
-        data: {
-          email: randomUUID() + "@example.com",
-          password,
-          agreement_accepted: true,
-          agreement_version: AGREEMENT_VERSION,
-          invitation,
-        },
-      });
-    expect((await signup(token)).status()).toBe(403);
-    await page.getByRole("button", { name: "Create invite" }).click();
-    await expect(invite).toHaveValue(new RegExp("#invite=[A-Za-z0-9_-]+$"));
-    const issued = new URL(await invite.inputValue()).hash.slice(
-      "#invite=".length,
+    await api(page, "auth/login", { email: tester, password });
+    const { billing } = await api(page, "flow");
+    expect(billing.active).toBe(false);
+    expect(new Date(billing.readUntil).getTime()).toBeGreaterThan(
+      Date.now() + 29 * 86400000,
     );
-    expect((await signup(issued)).status()).toBe(200);
-    expect((await page.goto("/admin/beta"))?.status()).toBe(404);
-    await api(page, "auth/login", { email, password });
-    await page.goto("/admin/beta");
-    await expect(page.getByRole("list", { name: "Invitations" })).toContainText(
-      "@example.com",
-    );
+    expect((await page.request.get("/api/export")).status()).toBe(200);
+    await page.goto("/settings");
     await expect(
-      page.getByRole("button", { name: /Revoke invite/ }),
-    ).toHaveCount(0);
+      page.getByText(/Read and export your saved work until/),
+    ).toBeVisible();
+    const maintenance = () =>
+      page.request.get("/api/maintenance", {
+        headers: { Authorization: "Bearer e2e-maintenance-secret" },
+      });
+    expect((await maintenance()).ok()).toBe(true);
+    expect(
+      (await db.query("SELECT id FROM users WHERE id=$1", [testerId])).rowCount,
+    ).toBe(1);
+    await db.query(
+      "UPDATE users SET beta_export_until=now()-interval '1 day',cleanup_after=now()-interval '1 second' WHERE id=$1",
+      [testerId],
+    );
+    expect((await page.request.get("/api/export")).status()).toBe(410);
+    expect((await maintenance()).ok()).toBe(true);
+    expect(
+      (await db.query("SELECT id FROM users WHERE id=$1", [testerId])).rowCount,
+    ).toBe(0);
   } finally {
     await db.end();
   }

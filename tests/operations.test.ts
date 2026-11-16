@@ -14,6 +14,7 @@ import {
 import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { paidExportDeadline } from "../lib/db";
 import { lockSourceWrite } from "../lib/source-write";
 import { mockBlob } from "../scripts/mock-blob.mjs";
 test("backup restores a consistent database and verified original files into an empty database", async () => {
@@ -70,6 +71,21 @@ test("backup restores a consistent database and verified original files into an 
       preview.stderr,
       /Preview cannot migrate the production database/,
     );
+    const oldBetaUser = randomUUID();
+    await source.query(
+      await readFile(
+        new URL("../lib/private-beta.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    await source.query(
+      "INSERT INTO users(id,email,name,password_hash) VALUES($1,'legacy-beta@example.test','Legacy beta','fixture')",
+      [oldBetaUser],
+    );
+    await source.query(
+      "INSERT INTO beta_invitations(slot,token_hash,user_id,claimed_at) VALUES (1,'claimed-legacy',$1,now()),(2,'pending-legacy',NULL,NULL)",
+      [oldBetaUser],
+    );
     for (let attempt = 0; attempt < 2; attempt++) {
       const migration = spawnSync(
         process.execPath,
@@ -81,7 +97,54 @@ test("backup restores a consistent database and verified original files into an 
     const {
       rows: [ledger],
     } = await source.query("SELECT count(*)::int AS n FROM schema_migrations");
-    assert.equal(ledger.n, 20);
+    assert.equal(ledger.n, 21);
+    const { rows: approvals } = await source.query(
+      `SELECT i.slot,u.email,i.user_id
+       FROM beta_invitations i LEFT JOIN users u ON u.id=i.user_id ORDER BY i.slot`,
+    );
+    assert.deepEqual(approvals, [
+      {
+        slot: 1,
+        email: "legacy-beta@example.test",
+        user_id: oldBetaUser,
+      },
+      { slot: 2, email: null, user_id: null },
+    ]);
+    await source.query(
+      "INSERT INTO beta_invitations(slot,token_hash) VALUES (3,'old-release-still-writes')",
+    );
+    await source.query("DELETE FROM users WHERE id=$1", [oldBetaUser]);
+    assert.deepEqual(
+      (
+        await source.query(
+          "SELECT slot,token_hash FROM beta_invitations ORDER BY slot",
+        )
+      ).rows,
+      [
+        { slot: 1, token_hash: "claimed-legacy" },
+        { slot: 2, token_hash: "pending-legacy" },
+        { slot: 3, token_hash: "old-release-still-writes" },
+      ],
+    );
+    await source.query("TRUNCATE beta_invitations");
+    await source.query("BEGIN");
+    try {
+      await source.query("SET LOCAL TIME ZONE 'America/Chicago'");
+      const {
+        rows: [retention],
+      } = await source.query(
+        `SELECT ${paidExportDeadline} AS deadline
+         FROM (SELECT '2026-03-01 12:00:00-06'::timestamptz AS paid_until) s
+         CROSS JOIN (SELECT NULL::timestamptz AS beta_export_until) u`,
+      );
+      assert.equal(
+        retention.deadline.toISOString(),
+        "2026-03-31T18:00:00.000Z",
+      );
+    } finally {
+      await source.query("ROLLBACK");
+    }
+
     await source.query(
       "INSERT INTO deployment_environment(singleton,name) VALUES(true,'preview')",
     );

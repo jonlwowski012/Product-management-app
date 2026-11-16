@@ -36,7 +36,7 @@ export function LaunchInfo({
           </p>
           <p>
             {beta ? (
-              "Invited testers get full access. No card required."
+              "Approved testers get full access. No card required."
             ) : (
               <>
                 <strong>$10 USD per month.</strong> One private workspace, one
@@ -77,7 +77,7 @@ export function LaunchInfo({
             </li>
             <li>
               {beta
-                ? "Open your invitation link and create an account."
+                ? "Create an account and ask the beta admin to approve it."
                 : "Create an account with your email and a strong password."}
             </li>
             <li>

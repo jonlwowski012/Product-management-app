@@ -213,13 +213,14 @@ export async function simpleMetadata(user: string) {
     sources_total: retained ? sources.total : 0,
     billing,
     analysisReady: hasOwnKey && billing.active,
-    analysisReadiness: !hasOwnKey
-      ? "Connect your own AI provider in Settings. Provider charges are separate."
-      : !billing.active
-        ? billing.paymentsEnabled
-          ? "Subscribe for $10/month in Settings to start discovery."
-          : "Access requires a beta invitation."
-        : "Your analysis connection is ready.",
+    analysisReadiness:
+      !billing.active && !billing.paymentsEnabled
+        ? "Access requires an approved beta email."
+        : !hasOwnKey
+          ? "Connect your own AI provider in Settings. Provider charges are separate."
+          : !billing.active
+            ? "Subscribe for $10/month in Settings to start discovery."
+            : "Your analysis connection is ready.",
     analysisProvider: settings[0]?.provider || "groq",
     settings: settings[0],
     hasOwnKey,
