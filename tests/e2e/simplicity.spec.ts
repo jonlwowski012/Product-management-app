@@ -49,6 +49,7 @@ test("updating a report includes its sources and allows removing one", async ({
   await expect(page.getByTestId("opportunity-card")).toHaveCount(1, {
     timeout: 60000,
   });
+  await expect(page).toHaveURL(/\/reports\/[a-f0-9-]+$/);
   const first = page.url().split("/").pop();
   await page
     .getByRole("button", { name: "Add more material", exact: true })
@@ -73,6 +74,7 @@ test("updating a report includes its sources and allows removing one", async ({
   await expect(page.getByTestId("opportunity-card")).toHaveCount(1, {
     timeout: 60000,
   });
+  await expect(page).toHaveURL(/\/reports\/[a-f0-9-]+$/);
   const report = await api(page, "reports/" + page.url().split("/").pop());
   expect(report.sources).toHaveLength(1);
   expect(report.result.findings[0].quote).toContain("I would pay");
@@ -103,6 +105,7 @@ test("reused documents can still be marked as company context", async ({
       exact: true,
     }),
   ).toBeVisible({ timeout: 60000 });
+  await expect(page).toHaveURL(/\/reports\/[a-f0-9-]+$/);
   const report = await api(page, "reports/" + page.url().split("/").pop());
   expect(report.sources[0].role).toBe("context");
   expect(report.result.opportunities).toHaveLength(0);
