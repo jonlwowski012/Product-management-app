@@ -40,6 +40,7 @@ try {
     ["019", "source-deletion.sql"],
     ["020", "source-deletion-receipts.sql"],
     ["021", "beta-email-approvals.sql"],
+    ["022", "source-connections.sql"],
   ]) {
     const sql = await readFile(
       new URL("../lib/" + file, import.meta.url),

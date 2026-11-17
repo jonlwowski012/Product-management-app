@@ -31,6 +31,7 @@ import {
 } from "@/lib/discovery-limits";
 import { AppLink, DownloadLink, request, Modal, Field } from "./ui";
 import { SavedMaterial } from "./saved-material";
+import { SourceConnections } from "./source-connections";
 import { DemoWelcome } from "./demo";
 import { SettingsPage } from "./settings";
 import { ValidationWork, EarlierValidationWork } from "./validation-work";
@@ -868,6 +869,20 @@ export function WorkflowApp({
                         >
                           Choose folder
                         </button>
+                        {!demo && meta.sourceProviders?.length > 0 && (
+                          <SourceConnections
+                            providers={meta.sourceProviders}
+                            onImport={async (source) => {
+                              await refresh();
+                              setSelected((current) =>
+                                uniqueSourceSelections([
+                                  ...current,
+                                  { id: source.id, role: source.role },
+                                ]),
+                              );
+                            }}
+                          />
+                        )}
                       </div>
                       <input
                         ref={input}
@@ -1943,6 +1958,18 @@ function SourceViewer({
       ) : (
         <>
           <h3>{data.filename}</h3>
+          {data.external_url && (
+            <p>
+              <a
+                className="text-link"
+                href={data.external_url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open in source app
+              </a>
+            </p>
+          )}
           <DownloadLink
             className="text-link"
             href={

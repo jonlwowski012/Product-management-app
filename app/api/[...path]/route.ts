@@ -353,7 +353,7 @@ async function handle(req: NextRequest, parts: string[]) {
     ] = await Promise.all([
       query("SELECT * FROM discovery_reports WHERE user_id=$1", [user]),
       query(
-        "SELECT id,filename,sha256,pages,warnings,role,created_at FROM discovery_sources WHERE user_id=$1",
+        "SELECT id,filename,sha256,pages,warnings,role,created_at,external_url FROM discovery_sources WHERE user_id=$1",
         [user],
       ),
       query("SELECT * FROM discovery_report_sources WHERE user_id=$1", [user]),

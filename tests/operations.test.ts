@@ -97,7 +97,7 @@ test("backup restores a consistent database and verified original files into an 
     const {
       rows: [ledger],
     } = await source.query("SELECT count(*)::int AS n FROM schema_migrations");
-    assert.equal(ledger.n, 21);
+    assert.equal(ledger.n, 22);
     const { rows: approvals } = await source.query(
       `SELECT i.slot,u.email,i.user_id
        FROM beta_invitations i LEFT JOIN users u ON u.id=i.user_id ORDER BY i.slot`,

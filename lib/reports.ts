@@ -44,6 +44,7 @@ import {
   evidenceSelectionPrompt,
   selectedEvidence,
 } from "./evidence-reduction";
+import { sourceConnector, sourceProvider } from "./source-connections";
 import { opportunityId } from "./discovery-experience";
 
 export const REPORT_VERSION = "opportunities-8";
@@ -55,6 +56,7 @@ export async function discoverySource(
   storage: string | null = null,
   storageKey: string | null = null,
   origin?: SourceWrite,
+  remote?: { url?: string; role: "auto" | "context" },
 ) {
   await assertWritableUser(user);
   const sha = hash(buffer.toString("base64"));
@@ -97,7 +99,7 @@ export async function discoverySource(
       if (!storage)
         throw new AppError("Private Blob storage is not configured", 503);
       return write(
-        "INSERT INTO discovery_sources(id,user_id,filename,sha256,pages,warnings,storage_path,storage_key,original_bytes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(user_id,sha256) DO UPDATE SET filename=discovery_sources.filename RETURNING id",
+        "INSERT INTO discovery_sources(id,user_id,filename,sha256,pages,warnings,storage_path,storage_key,original_bytes,external_url,role) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(user_id,sha256) DO UPDATE SET filename=discovery_sources.filename RETURNING id",
         [
           sid,
           user,
@@ -108,12 +110,15 @@ export async function discoverySource(
           storage,
           storageKey,
           buffer.length,
+          remote?.url ?? null,
+          remote?.role ?? "auto",
         ],
       );
     };
     [row] = origin
       ? await transaction(async (c) => {
           await lockSourceWrite(c, user, origin);
+          if (remote) await assertWritableUser(user, c);
           return insert(
             async (sql, params) => (await c.query(sql, params)).rows,
           );
@@ -209,6 +214,9 @@ export async function simpleMetadata(user: string) {
     !billing.readUntil || new Date(billing.readUntil).getTime() > Date.now();
   return {
     reports: retained ? reports : [],
+    sourceProviders: sourceProvider.options.filter((provider) =>
+      sourceConnector(provider),
+    ),
     sources: retained ? sources.sources : [],
     sources_total: retained ? sources.total : 0,
     billing,

@@ -52,6 +52,7 @@ test("partial report recovery preserves the readable snapshot and successful che
     const { discoverySource, createReport, reportDetail } =
       await import("../lib/reports");
     const { reportApi } = await import("../lib/report-api");
+    const { beginDirectSourceWrite } = await import("../lib/source-write");
     const { runOne } = await import("../lib/jobs");
     const user = randomUUID();
     await db.query(
@@ -59,6 +60,56 @@ test("partial report recovery preserves the readable snapshot and successful che
       [user, user + "@example.com"],
     );
     await paidAccount(db, user, "mock-source-errors");
+    const remote = {
+      url: "https://example.atlassian.net/wiki/pages/viewpage.action?pageId=42",
+      role: "context",
+    } as const;
+    const remoteBytes = Buffer.from(
+      "Our internal plan is to investigate export controls.",
+    );
+    const imported = await discoverySource(
+      user,
+      "Internal roadmap.txt",
+      remoteBytes,
+      null,
+      null,
+      await beginDirectSourceWrite(),
+      remote,
+    );
+    const repeated = await discoverySource(
+      user,
+      "Internal roadmap.txt",
+      remoteBytes,
+      null,
+      null,
+      await beginDirectSourceWrite(),
+      remote,
+    );
+    assert.equal(repeated.id, imported.id);
+    assert.equal(repeated.duplicate, true);
+    const readSource = (owner: string) =>
+      reportApi(
+        {
+          method: "GET",
+          nextUrl: new URL("https://app.example/api/sources/" + imported.id),
+        } as any,
+        ["sources", imported.id],
+        owner,
+        async () => ({}),
+        async () => Buffer.alloc(0),
+      );
+    const source = await readSource(user);
+    assert.ok(source && "external_url" in source);
+    assert.equal(source.external_url, remote.url);
+    assert.equal(
+      (
+        await db.query("SELECT role FROM discovery_sources WHERE id=$1", [
+          imported.id,
+        ])
+      ).rows[0].role,
+      "context",
+    );
+    await assert.rejects(readSource(randomUUID()), /Source not found/);
     const sources = [];
     for (const filename of ["Failed interview.txt", "Good interview.txt"])
       sources.push(

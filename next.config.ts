@@ -21,6 +21,11 @@ const config: NextConfig = {
   },
   experimental: { serverActions: { bodySizeLimit: "12mb" } },
   async headers() {
+    const googlePicker = Boolean(
+      process.env.SOURCE_CONNECT_GOOGLE_DRIVE &&
+      process.env.GOOGLE_PICKER_API_KEY &&
+      process.env.GOOGLE_PICKER_APP_ID,
+    );
     return [
       {
         source: "/:path*",
@@ -30,7 +35,7 @@ const config: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           {
             key: "Content-Security-Policy",
-            value: `default-src 'self'; script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${process.env.VERCEL === "1" ? "https://vercel.com/api/blob/ https://*.blob.vercel-storage.com" : ""} ${process.env.E2E_TEST_MODE === "1" && process.env.NODE_ENV === "development" ? "https://vercel.com/api/blob/ https://*.blob.vercel-storage.com http://127.0.0.1:3102" : ""}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
+            value: `default-src 'self'; script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} ${googlePicker ? "https://apis.google.com" : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${process.env.VERCEL === "1" ? "https://vercel.com/api/blob/ https://*.blob.vercel-storage.com" : ""} ${process.env.E2E_TEST_MODE === "1" && process.env.NODE_ENV === "development" ? "https://vercel.com/api/blob/ https://*.blob.vercel-storage.com http://127.0.0.1:3102" : ""}; ${googlePicker ? "frame-src https://docs.google.com https://drive.google.com; " : ""}frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
           },
         ],
       },
