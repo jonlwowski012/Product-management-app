@@ -44,7 +44,8 @@ import {
   evidenceSelectionPrompt,
   selectedEvidence,
 } from "./evidence-reduction";
-import { sourceConnector, sourceProvider } from "./source-connections";
+import { sourceProvider } from "./source-connections";
+import { sourceConnector } from "./source-connector-config";
 import { opportunityId } from "./discovery-experience";
 
 export const REPORT_VERSION = "opportunities-8";
@@ -64,7 +65,24 @@ export async function discoverySource(
     "SELECT id FROM discovery_sources WHERE user_id=$1 AND sha256=$2",
     [user, sha],
   );
-  if (existing) return { id: existing.id, duplicate: true };
+  if (existing && !remote) return { id: existing.id, duplicate: true };
+  if (existing && origin && remote) {
+    return transaction(async (client) => {
+      await lockSourceWrite(client, user, origin);
+      await assertWritableUser(user, client);
+      const result = await client.query(
+        `UPDATE discovery_sources
+         SET external_url=coalesce(external_url,$3),
+             context_default_at=CASE WHEN role='auto' AND $4='context' THEN clock_timestamp() ELSE context_default_at END,
+             role=CASE WHEN role='auto' THEN $4 ELSE role END
+         WHERE id=$1 AND user_id=$2 RETURNING id`,
+        [existing.id, user, remote.url ?? null, remote.role],
+      );
+      if (!result.rowCount)
+        throw new AppError("Saved source is no longer available.", 409);
+      return { id: existing.id, duplicate: true };
+    });
+  }
   const parsed = await readDocument(name, buffer),
     sid = id();
   const incomingStorage = Boolean(storage);
@@ -99,7 +117,13 @@ export async function discoverySource(
       if (!storage)
         throw new AppError("Private Blob storage is not configured", 503);
       return write(
-        "INSERT INTO discovery_sources(id,user_id,filename,sha256,pages,warnings,storage_path,storage_key,original_bytes,external_url,role) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(user_id,sha256) DO UPDATE SET filename=discovery_sources.filename RETURNING id",
+        `INSERT INTO discovery_sources(id,user_id,filename,sha256,pages,warnings,storage_path,storage_key,original_bytes,external_url,role)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         ON CONFLICT(user_id,sha256) DO UPDATE SET
+           external_url=coalesce(discovery_sources.external_url,excluded.external_url),
+           context_default_at=CASE WHEN discovery_sources.role='auto' AND excluded.role='context' THEN clock_timestamp() ELSE discovery_sources.context_default_at END,
+           role=CASE WHEN discovery_sources.role='auto' THEN excluded.role ELSE discovery_sources.role END
+         RETURNING id`,
         [
           sid,
           user,
@@ -165,6 +189,23 @@ export async function discoveryUpload(
     });
   return { sources, warnings };
 }
+// Recovery copies the original role selection and keeps its date for source defaults.
+const savedSourceRole = `coalesce((
+  SELECT CASE WHEN rs.role='auto' AND coalesce(root.created_at,r.created_at)<s.context_default_at THEN s.role ELSE rs.role END
+  FROM discovery_report_sources rs JOIN discovery_reports r ON r.id=rs.report_id AND r.user_id=rs.user_id
+  LEFT JOIN discovery_reports root ON root.id=r.recovery_root_id AND root.user_id=r.user_id
+  WHERE rs.source_id=s.id AND rs.user_id=s.user_id
+  ORDER BY r.created_at DESC,r.id DESC LIMIT 1
+),s.role)`;
+
+export async function importedSourceDetails(user: string, source: string) {
+  const [item] = await query<{ filename: string; role: string }>(
+    `SELECT s.filename,${savedSourceRole} AS role FROM discovery_sources s WHERE s.user_id=$1 AND s.id=$2`,
+    [user, source],
+  );
+  if (!item) throw new AppError("Saved source is no longer available.", 409);
+  return item;
+}
 export async function savedSources(
   user: string,
   search = "",
@@ -174,10 +215,7 @@ export async function savedSources(
   const [sources, [count]] = await Promise.all([
     query(
       `SELECT s.id,s.filename,s.sha256,
-      coalesce((SELECT rs.role FROM discovery_report_sources rs
-        JOIN discovery_reports r ON r.id=rs.report_id AND r.user_id=rs.user_id
-        WHERE rs.source_id=s.id AND rs.user_id=$1
-        ORDER BY r.created_at DESC,r.id DESC LIMIT 1),s.role) AS role,
+      ${savedSourceRole} AS role,
       s.warnings,s.created_at,jsonb_array_length(s.pages) AS pages,
       (SELECT coalesce(sum(length(p->>'text')),0)::int FROM jsonb_array_elements(s.pages) p) AS characters
     FROM discovery_sources s WHERE s.user_id=$1 AND strpos(lower(s.filename),lower($2))>0

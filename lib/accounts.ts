@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { AppError, query, transaction, betaAccess } from "./db";
 import { checkPassword, hashPassword } from "./crypto";
 import { stripe, syncCustomer } from "./billing";
+import { disconnectAccountSources } from "./source-connection-grants";
 
 const accountFingerprint = (identity: string) =>
   createHmac("sha256", process.env.APP_SECRET!).update(identity).digest("hex");
@@ -132,6 +133,7 @@ export async function deleteAccount(user: string, password?: string) {
       customer_id: billing.customer_id,
       checkout_id: billing.checkout_id,
     });
+  await disconnectAccountSources(user);
   await transaction(async (c) => {
     await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [user]);
     await c.query("SET CONSTRAINTS ALL DEFERRED");

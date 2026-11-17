@@ -82,7 +82,8 @@ test("Confluence reads only the authorized site's selected page and saves plain 
       ),
     /page link/,
   );
-  const cloudId = "defe90be-6d04-4c95-8cec-837d90316603";
+  const pageText = "a".repeat(3 * 1024 * 1024);
+  const cloudId = "8594f221-9797-5f78-1fa4-485e198d7cd0";
   t.mock.method(globalThis, "fetch", async (url: string) => {
     if (url === "https://api.atlassian.com/oauth/token/accessible-resources")
       return fromJson([{ id: cloudId, url: "https://acme.atlassian.net" }]);
@@ -102,7 +103,7 @@ test("Confluence reads only the authorized site's selected page and saves plain 
               },
               {
                 type: "paragraph",
-                content: [{ type: "text", text: "Audit log priority." }],
+                content: [{ type: "text", text: pageText }],
               },
             ],
           }),
@@ -115,7 +116,7 @@ test("Confluence reads only the authorized site's selected page and saves plain 
   });
   const file = await downloadConfluence("test", link);
   assert.equal(file.role, "context");
-  assert.equal(file.bytes.toString(), "Research\nAudit log priority.");
+  assert.equal(file.bytes.toString(), "Research\n" + pageText);
   await assert.rejects(
     downloadConfluence("test", link.replace("acme", "other")),
     /Authorize this Confluence site/,
@@ -124,8 +125,10 @@ test("Confluence reads only the authorized site's selected page and saves plain 
 
 test("Google Docs are exported as text and oversized downloads are rejected", async (t) => {
   const urls: string[] = [];
-  t.mock.method(globalThis, "fetch", async (url: string) => {
+  const keys: (string | null)[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
     urls.push(url);
+    keys.push(new Headers(init.headers).get("x-goog-drive-resource-keys"));
     if (url.includes("fields="))
       return fromJson({
         name: "Interview",
@@ -135,9 +138,11 @@ test("Google Docs are exported as text and oversized downloads are rejected", as
     if (urls.length === 2) return new Response("Please add CSV exports.");
     return new Response("large", { headers: { "content-length": "10485761" } });
   });
-  const file = await downloadGoogleDrive("test", "Doc-42");
+  const file = await downloadGoogleDrive("test", "Doc-42", "0-test");
   assert.equal(file.name, "Interview.txt");
   assert.equal(file.bytes.toString(), "Please add CSV exports.");
+  assert.deepEqual(keys, ["Doc-42/0-test", "Doc-42/0-test"]);
+  assert.match(urls[0], /supportsAllDrives=true/);
   assert.match(urls[1], /\/export\?mimeType=text%2Fplain$/);
   await assert.rejects(downloadGoogleDrive("test", "Doc-42"), /size limit/);
 });
@@ -145,19 +150,31 @@ test("Google Docs are exported as text and oversized downloads are rejected", as
 test("Granola notes and transcripts use different read tools and evidence roles", async (t) => {
   const meeting = "1d2fcfd0-7d53-4799-9c10-bc715c8afceb";
   const completed: string[] = [];
+  let terminated = 0;
   t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
     assert.equal(String(url), "https://mcp.granola.ai/mcp");
     assert.equal(new Headers(init.headers).get("authorization"), "Bearer test");
+    if (init.method === "DELETE") {
+      assert.equal(
+        new Headers(init.headers).get("mcp-session-id"),
+        "example-session",
+      );
+      terminated++;
+      return new Response(null, { status: 204 });
+    }
     if (init.method !== "POST") return new Response(null, { status: 405 });
     const req = JSON.parse(String(init.body));
     const respond = (result: object) =>
       fromJson({ jsonrpc: "2.0", id: req.id, result });
-    if (req.method === "initialize")
-      return respond({
+    if (req.method === "initialize") {
+      const response = respond({
         protocolVersion: req.params.protocolVersion,
         capabilities: { tools: {} },
         serverInfo: { name: "Granola", version: "1" },
       });
+      response.headers.set("mcp-session-id", "example-session");
+      return response;
+    }
     if (req.method === "notifications/initialized")
       return new Response(null, { status: 202 });
     assert.equal(req.method, "tools/call");
@@ -222,6 +239,7 @@ test("Granola notes and transcripts use different read tools and evidence roles"
     downloadGranola("test", meeting, "Interview", true),
     /paid plan/,
   );
+  assert.equal(terminated, 4);
   assert.deepEqual(completed, [
     "list_meetings",
     "get_meetings",

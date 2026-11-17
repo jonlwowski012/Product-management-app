@@ -20,6 +20,7 @@ export type RemoteSource = {
   title: string;
   folder?: boolean;
   date?: string;
+  resourceKey?: string;
 };
 
 export type SourceConnectionResult = {
@@ -27,17 +28,5 @@ export type SourceConnectionResult = {
   items?: RemoteSource[];
   cursor?: string;
   picker?: { token: string; key: string; appId: string };
-  source?: { id: string; role: string; duplicate: boolean };
+  source?: { id: string; filename: string; role: string; duplicate: boolean };
 };
-
-export function sourceConnector(provider: SourceProvider) {
-  return {
-    onedrive: process.env.SOURCE_CONNECT_ONEDRIVE,
-    confluence: process.env.SOURCE_CONNECT_CONFLUENCE,
-    "google-drive":
-      process.env.GOOGLE_PICKER_API_KEY && process.env.GOOGLE_PICKER_APP_ID
-        ? process.env.SOURCE_CONNECT_GOOGLE_DRIVE
-        : undefined,
-    granola: process.env.SOURCE_CONNECT_GRANOLA,
-  }[provider];
-}

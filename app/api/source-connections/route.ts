@@ -1,6 +1,5 @@
 import {
   getToken,
-  revokeToken,
   startAuthorization,
   UserAuthorizationRequiredError,
   NoValidTokenError,
@@ -10,13 +9,15 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { AppError, assertPersonalUser, assertWritableUser } from "@/lib/db";
 import { apiResult, sameOrigin, smallJson } from "@/lib/http";
-import { discoverySource } from "@/lib/reports";
+import { discoverySource, importedSourceDetails } from "@/lib/reports";
 import { beginDirectSourceWrite } from "@/lib/source-write";
+import { sourceProvider, type SourceProvider } from "@/lib/source-connections";
+import { sourceConnector } from "@/lib/source-connector-config";
 import {
-  sourceConnector,
-  sourceProvider,
-  type SourceProvider,
-} from "@/lib/source-connections";
+  disconnectSource,
+  rememberSourceGrant,
+  sourceAuthorizationMs,
+} from "@/lib/source-connection-grants";
 import {
   downloadConfluence,
   downloadGoogleDrive,
@@ -49,6 +50,10 @@ const action = z.discriminatedUnion("action", [
     id: idValue,
     title: z.string().min(1).max(300).optional(),
     transcript: z.boolean().optional(),
+    resourceKey: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,256}$/)
+      .optional(),
   }),
   z.object({ action: z.literal("disconnect") }),
 ]);
@@ -69,7 +74,7 @@ export async function POST(req: Request) {
     };
     if (input.action === "disconnect") {
       await assertPersonalUser(user.id);
-      await revokeToken(uid, { subject });
+      await disconnectSource(user.id, uid);
       return { disconnected: true };
     }
     await assertWritableUser(user.id);
@@ -85,10 +90,11 @@ export async function POST(req: Request) {
         error instanceof NoValidTokenError
       ))
         throw error;
+      await rememberSourceGrant(user.id, uid);
       const callback = new URL("/?new=1", process.env.APP_URL);
       const authorization = await startAuthorization(uid, tokenParams, {
         callbackUrl: callback.href,
-        expiresInMs: 15 * 60 * 1000,
+        expiresInMs: sourceAuthorizationMs,
       });
       return { authorization: authorization.url };
     }
@@ -116,7 +122,7 @@ export async function POST(req: Request) {
       provider === "onedrive"
         ? await downloadOneDrive(token, input.id)
         : provider === "google-drive"
-          ? await downloadGoogleDrive(token, input.id)
+          ? await downloadGoogleDrive(token, input.id, input.resourceKey)
           : provider === "confluence"
             ? await downloadConfluence(token, input.id)
             : await downloadGranola(
@@ -137,6 +143,11 @@ export async function POST(req: Request) {
         role: item.role,
       },
     );
-    return { source: { ...source, role: item.role } };
+    return {
+      source: {
+        ...source,
+        ...(await importedSourceDetails(user.id, source.id)),
+      },
+    };
   });
 }

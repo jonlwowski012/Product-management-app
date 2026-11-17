@@ -103,7 +103,14 @@ function ConnectionPicker({
           try {
             const { pickGoogleFile } = await import("./google-drive-picker");
             const item = await pickGoogleFile(result.picker);
-            if (item) setItems([{ id: item.id, title: item.name }]);
+            if (item)
+              setItems([
+                {
+                  id: item.id,
+                  title: item.name,
+                  resourceKey: item.resourceKey || undefined,
+                },
+              ]);
           } finally {
             setGoogleOpen(false);
           }
@@ -123,7 +130,12 @@ function ConnectionPicker({
   function importItem(item: RemoteSource, transcript = false) {
     void perform(
       "import",
-      { id: item.id, transcript, title: item.title.slice(0, 300) },
+      {
+        id: item.id,
+        transcript,
+        title: item.title.slice(0, 300),
+        resourceKey: item.resourceKey,
+      },
       async ({ source }) => {
         if (!source) return;
         await onImport(source);

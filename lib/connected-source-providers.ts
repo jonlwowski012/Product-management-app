@@ -51,12 +51,17 @@ function providerStatus(response: Response) {
 async function providerFetch(
   url: string | URL,
   token?: string,
-  redirect: RequestRedirect = "error",
+  options: { redirect?: RequestRedirect; resourceKey?: string } = {},
 ) {
   try {
     return await fetch(url, {
-      headers: token ? { Authorization: "Bearer " + token } : undefined,
-      redirect,
+      headers: {
+        ...(token && { Authorization: "Bearer " + token }),
+        ...(options.resourceKey && {
+          "X-Goog-Drive-Resource-Keys": options.resourceKey,
+        }),
+      },
+      redirect: options.redirect ?? "error",
       cache: "no-store",
       signal: AbortSignal.timeout(20_000),
     });
@@ -69,7 +74,10 @@ async function providerFetch(
 }
 
 async function bodyBytes(response: Response, max = MAX_UPLOAD) {
-  providerStatus(response);
+  if (!response.ok) {
+    await response.body?.cancel();
+    providerStatus(response);
+  }
   if (Number(response.headers.get("content-length")) > max) {
     await response.body?.cancel();
     throw new AppError(
@@ -102,8 +110,15 @@ async function providerJson<T>(
   url: string | URL,
   token: string,
   schema: z.ZodType<T>,
+  {
+    max = 2 * 1024 * 1024,
+    resourceKey,
+  }: { max?: number; resourceKey?: string } = {},
 ) {
-  const raw = await bodyBytes(await providerFetch(url, token), 2 * 1024 * 1024);
+  const raw = await bodyBytes(
+    await providerFetch(url, token, { resourceKey }),
+    max,
+  );
   try {
     return schema.parse(JSON.parse(raw.toString("utf8")));
   } catch {
@@ -182,8 +197,11 @@ export async function downloadOneDrive(
     throw new AppError("Choose a supported OneDrive file.");
   if ((item.size ?? 0) > MAX_UPLOAD)
     throw new AppError("Each file must be at most 10 MB.", 413);
-  let response = await providerFetch(url + "/content", token, "manual");
+  let response = await providerFetch(url + "/content", token, {
+    redirect: "manual",
+  });
   if (response.status === 302) {
+    await response.body?.cancel();
     const location = checkedUrl(
       response.headers.get("location") ?? "",
       microsoftHost,
@@ -211,10 +229,13 @@ const googleDoc = "application/vnd.google-apps.document";
 export async function downloadGoogleDrive(
   token: string,
   id: string,
+  key?: string,
 ): Promise<Download> {
   const url = `${drive}/${requireId(id)}`;
+  const resourceKey = key ? `${id}/${key}` : undefined;
   const item = await providerJson(
-    url + "?fields=name,mimeType,size,webViewLink,trashed",
+    url +
+      "?supportsAllDrives=true&fields=name,mimeType,size,webViewLink,trashed",
     token,
     z.object({
       name: z.string(),
@@ -223,6 +244,7 @@ export async function downloadGoogleDrive(
       webViewLink: z.string().optional(),
       trashed: z.boolean().optional(),
     }),
+    { resourceKey },
   );
   const doc = item.mimeType === googleDoc;
   const ext = item.name.match(discoveryExtensions)?.[0];
@@ -233,14 +255,18 @@ export async function downloadGoogleDrive(
     throw new AppError("Choose a Google Doc or a supported file.");
   if ((item.size ?? 0) > MAX_UPLOAD)
     throw new AppError("Each file must be at most 10 MB.", 413);
-  const endpoint = doc ? "/export?mimeType=text%2Fplain" : "?alt=media";
+  const endpoint = doc
+    ? "/export?mimeType=text%2Fplain"
+    : "?alt=media&supportsAllDrives=true";
   return {
     name: doc
       ? filename(item.name, ".txt")
       : filename(item.name.replace(discoveryExtensions, ""), ext),
     url: checkedUrl(item.webViewLink ?? "", /^(docs|drive)\.google\.com$/)
       ?.href,
-    bytes: await bodyBytes(await providerFetch(url + endpoint, token)),
+    bytes: await bodyBytes(
+      await providerFetch(url + endpoint, token, { resourceKey }),
+    ),
     role: "auto",
   };
 }
@@ -262,7 +288,7 @@ async function confluencePage(token: string, link: string, body: boolean) {
   const sites = await providerJson(
     atlassian + "/oauth/token/accessible-resources",
     token,
-    z.array(z.object({ id: z.uuid(), url: z.string() })),
+    z.array(z.object({ id: z.guid(), url: z.string() })),
   );
   const cloud = sites.find((entry) => URL.parse(entry.url)?.origin === site);
   if (!cloud)
@@ -281,6 +307,7 @@ async function confluencePage(token: string, link: string, body: boolean) {
         })
         .optional(),
     }),
+    body ? { max: MAX_UPLOAD * 2 } : undefined,
   );
   return { ...page, url: `${site}/wiki/pages/viewpage.action?pageId=${id}` };
 }
@@ -327,9 +354,12 @@ export async function downloadConfluence(
   } catch {
     throw new AppError("Confluence returned an unreadable page.", 502);
   }
+  const bytes = Buffer.from(text);
+  if (bytes.length > MAX_UPLOAD)
+    throw new AppError("The page exceeds 10 MB of extracted text.", 413);
   return {
     name: filename(page.title, ".txt"),
-    bytes: Buffer.from(text),
+    bytes,
     url: page.url,
     role: "context",
   };
@@ -409,6 +439,7 @@ async function meetingCall(
       502,
     );
   } finally {
+    await transport.terminateSession().catch(() => {});
     await client.close().catch(() => {});
   }
 }

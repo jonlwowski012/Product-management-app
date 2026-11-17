@@ -1,8 +1,12 @@
+type GoogleFile = { id: string; name: string; resourceKey?: string };
 type PickerResponse = {
   action: string;
-  docs?: { id: string; name: string }[];
+  docs?: GoogleFile[];
 };
-type DocsView = { setMode: (mode: string) => DocsView };
+type DocsView = {
+  setMode: (mode: string) => DocsView;
+  setEnableDrives: (enabled: boolean) => DocsView;
+};
 type PickerBuilder = {
   addView: (view: DocsView) => PickerBuilder;
   setAppId: (appId: string) => PickerBuilder;
@@ -22,19 +26,23 @@ let pickerLoading: Promise<PickerLibrary> | undefined;
 
 function loadPicker() {
   if (pickerLoading) return pickerLoading;
-  pickerLoading = new Promise<PickerLibrary>((resolve, reject) => {
-    const browser = window as Window & {
-      gapi?: {
-        load: (
-          name: string,
-          options: { callback: () => void; onerror: () => void },
-        ) => void;
-      };
-      google?: { picker?: PickerLibrary };
+  const browser = window as Window & {
+    gapi?: {
+      load: (
+        name: string,
+        options: { callback: () => void; onerror: () => void },
+      ) => void;
     };
+    google?: { picker?: PickerLibrary };
+  };
+  if (browser.google?.picker) return Promise.resolve(browser.google.picker);
+  pickerLoading = new Promise<PickerLibrary>((resolve, reject) => {
     const script = document.createElement("script");
-    const fail = () =>
+    const fail = () => {
+      window.clearTimeout(timeout);
+      script.remove();
       reject(new Error("Google Picker could not load. Try again."));
+    };
     const timeout = window.setTimeout(fail, 15_000);
     script.src = "https://apis.google.com/js/api.js";
     script.onerror = fail;
@@ -62,9 +70,14 @@ export async function pickGoogleFile(config: {
   appId: string;
 }) {
   const picker = await loadPicker();
-  return new Promise<{ id: string; name: string } | null>((resolve) => {
-    new picker.PickerBuilder()
+  return new Promise<GoogleFile | null>((resolve, reject) => {
+    const dialog = new picker.PickerBuilder()
       .addView(new picker.DocsView().setMode(picker.DocsViewMode.LIST))
+      .addView(
+        new picker.DocsView()
+          .setMode(picker.DocsViewMode.LIST)
+          .setEnableDrives(true),
+      )
       .setAppId(config.appId)
       .setOrigin(window.location.origin)
       .setDeveloperKey(config.key)
@@ -72,8 +85,12 @@ export async function pickGoogleFile(config: {
       .setCallback((data) => {
         if (data.action === "picked") resolve(data.docs?.[0] ?? null);
         if (data.action === "cancel") resolve(null);
+        if (data.action === "error") {
+          reject(new Error("Google Picker could not open Drive. Try again."));
+          dialog.setVisible(false);
+        }
       })
-      .build()
-      .setVisible(true);
+      .build();
+    dialog.setVisible(true);
   });
 }
