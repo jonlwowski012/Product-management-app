@@ -93,7 +93,7 @@ export function SettingsPage({
         <h1>Account deletion in progress</h1>
         <p>
           Your workspace is disabled. If cancellation or cleanup was
-          interrupted, retry below. Maintenance also retries automatically.
+          interrupted, retry below to finish deleting your account.
         </p>
         {deletePanel}
         <Form

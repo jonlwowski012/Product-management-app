@@ -31,6 +31,7 @@ import {
 } from "@/lib/discovery-limits";
 import { AppLink, DownloadLink, request, Modal, Field } from "./ui";
 import { SavedMaterial } from "./saved-material";
+import { SourceConnections } from "./source-connections";
 import { DemoWelcome } from "./demo";
 import { SettingsPage } from "./settings";
 import { ValidationWork, EarlierValidationWork } from "./validation-work";
@@ -48,7 +49,7 @@ import {
 } from "./discovery-files";
 
 type Row = Record<string, any>;
-type Selection = { id: string; role: string };
+type Selection = { id: string; role: string; roleChosen?: true };
 function recoveryHelp(message: string) {
   if (/credits|billing|spending|allowance/i.test(message))
     return "Check your provider's usage or billing before retrying.";
@@ -868,6 +869,36 @@ export function WorkflowApp({
                         >
                           Choose folder
                         </button>
+                        {!demo && meta.sourceProviders?.length > 0 && (
+                          <SourceConnections
+                            providers={meta.sourceProviders}
+                            onImport={async (source) => {
+                              await refresh();
+                              setMeta((m: Row | null) =>
+                                m &&
+                                !m.sources.some(
+                                  (item: Row) => item.id === source.id,
+                                )
+                                  ? { ...m, sources: [...m.sources, source] }
+                                  : m,
+                              );
+                              setSelected((current) => {
+                                const prior = current.find(
+                                  (item) => item.id === source.id,
+                                );
+                                if (
+                                  prior &&
+                                  (prior.roleChosen || prior.role !== "auto")
+                                )
+                                  return current;
+                                return uniqueSourceSelections([
+                                  ...current,
+                                  { id: source.id, role: source.role },
+                                ]);
+                              });
+                            }}
+                          />
+                        )}
                       </div>
                       <input
                         ref={input}
@@ -1010,7 +1041,11 @@ export function WorkflowApp({
                                 setSelected(
                                   selected.map((s) =>
                                     s.id === item.id
-                                      ? { ...s, role: e.target.value }
+                                      ? {
+                                          ...s,
+                                          role: e.target.value,
+                                          roleChosen: true,
+                                        }
                                       : s,
                                   ),
                                 )
@@ -1943,6 +1978,18 @@ function SourceViewer({
       ) : (
         <>
           <h3>{data.filename}</h3>
+          {data.external_url && (
+            <p>
+              <a
+                className="text-link"
+                href={data.external_url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open in source app
+              </a>
+            </p>
+          )}
           <DownloadLink
             className="text-link"
             href={

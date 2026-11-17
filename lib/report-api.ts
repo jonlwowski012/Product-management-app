@@ -144,7 +144,7 @@ export async function reportApi(
   if (parts[0] === "sources" && parts[1] && req.method === "GET") {
     const sid = z.uuid().parse(parts[1]);
     const [s] = await query(
-      "SELECT id,filename,pages,warnings,storage_path FROM discovery_sources WHERE id=$1 AND user_id=$2",
+      "SELECT id,filename,pages,warnings,storage_path,external_url FROM discovery_sources WHERE id=$1 AND user_id=$2",
       [sid, user],
     );
     if (!s) throw new AppError("Source not found", 404);
@@ -173,6 +173,7 @@ export async function reportApi(
     return {
       id: s.id,
       filename: s.filename,
+      external_url: s.external_url,
       warnings: s.warnings,
       page: s.pages[index],
       page_index: index,

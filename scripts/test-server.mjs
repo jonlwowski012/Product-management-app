@@ -104,6 +104,11 @@ await db.query(
     (await readFile(
       new URL("../lib/beta-email-approvals.sql", import.meta.url),
       "utf8",
+    )) +
+    "\n" +
+    (await readFile(
+      new URL("../lib/source-connections.sql", import.meta.url),
+      "utf8",
     )),
 );
 // Authentication limits belong to this isolated test run.

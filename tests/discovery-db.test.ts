@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mockProvider } from "../scripts/mock-provider.mjs";
 
-test("partial report recovery preserves the readable snapshot and successful checkpoints", async () => {
+test("partial report recovery preserves the readable snapshot and successful checkpoints", async (t) => {
   const name = "discovery_" + randomUUID().replaceAll("-", "") + "_e2e";
   const url = new URL(process.env.DATABASE_URL!);
   const adminUrl = new URL(url);
@@ -49,9 +49,15 @@ test("partial report recovery preserves the readable snapshot and successful che
       E2E_PROVIDER_BASE_URL: `http://127.0.0.1:${address.port}`,
     });
     delete process.env.SITE_ID;
-    const { discoverySource, createReport, reportDetail } =
-      await import("../lib/reports");
+    const {
+      discoverySource,
+      createReport,
+      reportDetail,
+      savedSources,
+      importedSourceDetails,
+    } = await import("../lib/reports");
     const { reportApi } = await import("../lib/report-api");
+    const { beginDirectSourceWrite } = await import("../lib/source-write");
     const { runOne } = await import("../lib/jobs");
     const user = randomUUID();
     await db.query(
@@ -59,6 +65,93 @@ test("partial report recovery preserves the readable snapshot and successful che
       [user, user + "@example.com"],
     );
     await paidAccount(db, user, "mock-source-errors");
+    const remote = {
+      url: "https://example.atlassian.net/wiki/pages/viewpage.action?pageId=42",
+      role: "context",
+    } as const;
+    const remoteBytes = Buffer.from(
+      "Our internal plan is to investigate export controls.",
+    );
+    const imported = await discoverySource(
+      user,
+      "Internal roadmap.txt",
+      remoteBytes,
+    );
+    const oldAutomaticReport = randomUUID();
+    await db.query(
+      "INSERT INTO discovery_reports(id,user_id,input_hash,result,created_at) VALUES($1,$2,$3,'{}',now()-interval '1 minute')",
+      [oldAutomaticReport, user, oldAutomaticReport],
+    );
+    await db.query(
+      "INSERT INTO discovery_report_sources(user_id,report_id,source_id,role) VALUES($1,$2,$3,'auto')",
+      [user, oldAutomaticReport, imported.id],
+    );
+    const repeated = await discoverySource(
+      user,
+      "Internal roadmap.txt",
+      remoteBytes,
+      null,
+      null,
+      await beginDirectSourceWrite(),
+      remote,
+    );
+    assert.equal(repeated.id, imported.id);
+    assert.equal(repeated.duplicate, true);
+    assert.equal(
+      (await savedSources(user, "Internal roadmap")).sources[0].role,
+      "context",
+    );
+    assert.equal(
+      (await importedSourceDetails(user, imported.id)).role,
+      "context",
+    );
+    const recoveryReport = randomUUID();
+    await db.query(
+      "INSERT INTO discovery_reports(id,user_id,input_hash,result,recovery_root_id) VALUES($1,$2,$3,'{}',$4)",
+      [recoveryReport, user, recoveryReport, oldAutomaticReport],
+    );
+    await db.query(
+      "INSERT INTO discovery_report_sources(user_id,report_id,source_id,role) VALUES($1,$2,$3,'auto')",
+      [user, recoveryReport, imported.id],
+    );
+    assert.equal(
+      (await importedSourceDetails(user, imported.id)).role,
+      "context",
+    );
+    await db.query("DELETE FROM discovery_reports WHERE id=$1", [
+      recoveryReport,
+    ]);
+    await db.query(
+      "UPDATE discovery_reports SET created_at=now() WHERE id=$1",
+      [oldAutomaticReport],
+    );
+    assert.equal((await importedSourceDetails(user, imported.id)).role, "auto");
+    await db.query("DELETE FROM discovery_reports WHERE id=$1", [
+      oldAutomaticReport,
+    ]);
+    const readSource = (owner: string) =>
+      reportApi(
+        {
+          method: "GET",
+          nextUrl: new URL("https://app.example/api/sources/" + imported.id),
+        } as any,
+        ["sources", imported.id],
+        owner,
+        async () => ({}),
+        async () => Buffer.alloc(0),
+      );
+    const source = await readSource(user);
+    assert.ok(source && "external_url" in source);
+    assert.equal(source.external_url, remote.url);
+    assert.equal(
+      (
+        await db.query("SELECT role FROM discovery_sources WHERE id=$1", [
+          imported.id,
+        ])
+      ).rows[0].role,
+      "context",
+    );
+    await assert.rejects(readSource(randomUUID()), /Source not found/);
     const sources = [];
     for (const filename of ["Failed interview.txt", "Good interview.txt"])
       sources.push(
@@ -291,6 +384,59 @@ test("partial report recovery preserves the readable snapshot and successful che
     await assert.rejects(
       () => call(["reports", stillPartial.id, "retry-omitted"]),
       /Recovery limit reached/,
+    );
+    const grantOwner = randomUUID();
+    const connector = "test/confluence";
+    await db.query(
+      "INSERT INTO users(id,email,name,password_hash) VALUES($1,$2,'Test','fixture')",
+      [grantOwner, grantOwner + "@example.com"],
+    );
+    await paidAccount(db, grantOwner);
+    const { rememberSourceGrant } =
+      await import("../lib/source-connection-grants");
+    const { deleteAccount } = await import("../lib/accounts");
+    await rememberSourceGrant(grantOwner, connector);
+    await assert.rejects(
+      deleteAccount(grantOwner),
+      /authorization links expire/,
+    );
+    await assert.rejects(
+      rememberSourceGrant(grantOwner, connector),
+      /read only/,
+    );
+    await db.query(
+      "UPDATE source_connection_grants SET authorization_until=now() WHERE user_id=$1",
+      [grantOwner],
+    );
+    process.env.VERCEL_OIDC_TOKEN =
+      "e30." +
+      Buffer.from(
+        JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }),
+      ).toString("base64url") +
+      ".test";
+    const revoke = t.mock.method(
+      globalThis,
+      "fetch",
+      async (url: string, options: RequestInit) => {
+        assert.match(
+          url,
+          /\/v1\/connect\/connectors\/test%2Fconfluence\/tokens$/,
+        );
+        assert.equal(options.method, "DELETE");
+        assert.deepEqual(JSON.parse(String(options.body)).subject, {
+          type: "user",
+          id: grantOwner,
+        });
+        return new Response(null, { status: 204 });
+      },
+    );
+    await deleteAccount(grantOwner);
+    assert.equal(revoke.mock.callCount(), 1);
+    revoke.mock.restore();
+    assert.equal(
+      (await db.query("SELECT id FROM users WHERE id=$1", [grantOwner]))
+        .rowCount,
+      0,
     );
   } finally {
     if (server)

@@ -4101,3 +4101,15 @@ fieldset:disabled textarea {
   line-height: 1.7;
   margin-top: 16px;
 }
+
+.flow-connected-items {
+  list-style: none;
+  padding: 0;
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+.flow-connected-item {
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--line);
+}

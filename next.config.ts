@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withWorkflow } from "workflow/next";
+import { sourceConnector } from "./lib/source-connector-config";
 const config: NextConfig = {
   poweredByHeader: false,
   webpack(config) {
@@ -21,6 +22,10 @@ const config: NextConfig = {
   },
   experimental: { serverActions: { bodySizeLimit: "12mb" } },
   async headers() {
+    const contentSecurityPolicy = (picker: boolean) => ({
+      key: "Content-Security-Policy",
+      value: `default-src 'self'; script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} ${picker ? "https://apis.google.com" : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${process.env.VERCEL === "1" ? "https://vercel.com/api/blob/ https://*.blob.vercel-storage.com" : ""} ${process.env.E2E_TEST_MODE === "1" && process.env.NODE_ENV === "development" ? "https://vercel.com/api/blob/ https://*.blob.vercel-storage.com http://127.0.0.1:3102" : ""}; ${picker ? "frame-src https://docs.google.com https://drive.google.com; " : ""}frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
+    });
     return [
       {
         source: "/:path*",
@@ -28,12 +33,27 @@ const config: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "same-origin" },
           { key: "X-Frame-Options", value: "DENY" },
-          {
-            key: "Content-Security-Policy",
-            value: `default-src 'self'; script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${process.env.VERCEL === "1" ? "https://vercel.com/api/blob/ https://*.blob.vercel-storage.com" : ""} ${process.env.E2E_TEST_MODE === "1" && process.env.NODE_ENV === "development" ? "https://vercel.com/api/blob/ https://*.blob.vercel-storage.com http://127.0.0.1:3102" : ""}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
-          },
+          contentSecurityPolicy(false),
         ],
       },
+      ...(sourceConnector("google-drive")
+        ? [
+            "/",
+            "/reports/:path*",
+            "/settings/:path*",
+            "/customers/:path*",
+            "/signals/:path*",
+            "/demo/:path*",
+            "/admin/beta",
+            "/pricing",
+            "/privacy",
+            "/terms",
+            "/help",
+          ].map((source) => ({
+            source,
+            headers: [contentSecurityPolicy(true)],
+          }))
+        : []),
     ];
   },
 };

@@ -12,7 +12,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "demo:seed": "tsx scripts/seed-demo.ts",
     "typecheck": "tsc --noEmit",
-    "test:unit": "tsx --test tests/unit.test.ts tests/workflow.test.ts tests/groq-limits.test.ts tests/research.test.ts tests/discovery-experience.test.ts tests/netlify.test.ts tests/netlify-workflow.test.ts tests/deployment.test.mjs tests/api-request.test.ts",
+    "test:unit": "tsx --test tests/unit.test.ts tests/workflow.test.ts tests/groq-limits.test.ts tests/research.test.ts tests/discovery-experience.test.ts tests/netlify.test.ts tests/netlify-workflow.test.ts tests/deployment.test.mjs tests/api-request.test.ts tests/source-connections.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test": "npm run typecheck && npm run test:unit && npm run test:ops && npm run test:e2e",
@@ -31,9 +31,11 @@
     "test:netlify-package": "node scripts/netlify-package-smoke.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@netlify/async-workloads": "0.0.92",
     "@netlify/blobs": "^11.1.9",
     "@vercel/blob": "^2.8.2",
+    "@vercel/connect": "2.9.3",
     "@zip.js/zip.js": "^2.24.0",
     "adm-zip": "^0.6.1",
     "dotenv": "^17.2.3",

@@ -97,7 +97,8 @@ export async function loadResearch(
     ),
     read(
       `SELECT s.id,s.sha256 AS fingerprint,'source' AS kind,s.filename,s.created_at::text,left(s.pages->0->>'text',4000) AS header,
-      coalesce((SELECT rs.role FROM discovery_report_sources rs JOIN discovery_reports r ON r.id=rs.report_id AND r.user_id=rs.user_id
+      coalesce((SELECT CASE WHEN rs.role='auto' AND coalesce(root.created_at,r.created_at)<s.context_default_at THEN s.role ELSE rs.role END FROM discovery_report_sources rs JOIN discovery_reports r ON r.id=rs.report_id AND r.user_id=rs.user_id
+      LEFT JOIN discovery_reports root ON root.id=r.recovery_root_id AND root.user_id=r.user_id
       WHERE rs.source_id=s.id AND rs.user_id=$1 AND NOT r.id=ANY($2::uuid[]) AND r.result IS NOT NULL ORDER BY r.created_at DESC,r.id DESC LIMIT 1),s.role) AS role
       FROM discovery_sources s WHERE s.user_id=$1 AND s.id IS DISTINCT FROM $3`,
       [user, excluding.reportIds, excluding.sourceId ?? null],
